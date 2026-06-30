@@ -8,16 +8,17 @@ import requests
 
 st.set_page_config(page_title="Form Pinjaman Koperasi", layout="centered")
 
-# =========================================================
-# KONFIGURASI GITHUB MAS LIAN
-# =========================================================
-GITHUB_USERNAME = "operansangiang-rs"
-GITHUB_REPO = "koperasi.sng-app"
-DATASTORE_FILE = "data_store.json"
+# =========================================================================
+# 🔐 MENGAMBIL DATA REPO & TOKEN AMAN DARI STREAMLIT SECRETS
+# =========================================================================
+try:
+    GITHUB_TOKEN = st.secrets["github"]["token"]
+    REPO_NAME = st.secrets["github"]["repo"]  # Format di secrets: "operansangiang-rs/koperasi.sng-app"
+except Exception:
+    GITHUB_TOKEN = ""
+    REPO_NAME = ""
 
-# Gantilah teks di bawah ini dengan token ghp_... milik Mas Lian
-GITHUB_TOKEN = "MASUKKAN_TOKEN_GITHUB_MAS_LIAN_DI_SINI" 
-# =========================================================
+DB_FILE = "data_store.json"
 
 TEMPLATE_AWAL = {
     "database": [],
@@ -30,31 +31,33 @@ TEMPLATE_AWAL = {
 
 # Fungsi Membaca Data Langsung dari GitHub API
 def load_data_from_github():
-    url = f"https://api.github.com/repos/{GITHUB_USERNAME}/{GITHUB_REPO}/contents/{DATASTORE_FILE}"
-    
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    
-    response = requests.get(url, headers=headers)
-    
-    if response.status_code == 200:
-        file_content = response.json()
-        content_decoded = base64.b64decode(file_content["content"]).decode("utf-8")
-        if content_decoded.strip() == "":
-            return TEMPLATE_AWAL, file_content.get("sha", None)
-        try:
-            return json.loads(content_decoded), file_content["sha"]
-        except Exception:
-            return TEMPLATE_AWAL, file_content.get("sha", None)
-    else:
-        return TEMPLATE_AWAL, None
+    if GITHUB_TOKEN.startswith("ghp_") and "/" in REPO_NAME:
+        url = f"https://api.github.com/repos/{REPO_NAME}/contents/{DB_FILE}"
+        headers = {
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            file_content = response.json()
+            content_decoded = base64.b64decode(file_content["content"]).decode("utf-8")
+            if content_decoded.strip() == "":
+                return TEMPLATE_AWAL, file_content.get("sha", None)
+            try:
+                data = json.loads(content_decoded)
+                if "database" not in data: data["database"] = []
+                if "categories" not in data: data["categories"] = []
+                return data, file_content["sha"]
+            except Exception:
+                return TEMPLATE_AWAL, file_content.get("sha", None)
+    return TEMPLATE_AWAL, None
 
-# Fungsi Menyimpan Data dan Commit Otomatis ke GitHub
+# Fungsi Menyimpan Data dan Commit Otomatis ke GitHub (Anti Reboot/Hilang)
 def save_data_to_github(nama, no_anggota, nominal, keperluan, kategori, ttd_base64):
     data_lama, sha_lama = load_data_from_github()
     
+    # Bungkus ke dalam list "database"
     entri_baru = {
         "nama": nama,
         "no_anggota": no_anggota,
@@ -65,14 +68,14 @@ def save_data_to_github(nama, no_anggota, nominal, keperluan, kategori, ttd_base
     }
     data_lama["database"].append(entri_baru)
     
+    # Masukkan ke list categories jika mengetik kategori baru
     if kategori not in data_lama["categories"]:
         data_lama["categories"].append(kategori)
         
     json_string = json.dumps(data_lama, indent=4, ensure_ascii=False)
     content_encoded = base64.b64encode(json_string.encode("utf-8")).decode("utf-8")
     
-    url = f"https://api.github.com/repos/{GITHUB_USERNAME}/{GITHUB_REPO}/contents/{DATASTORE_FILE}"
-    
+    url = f"https://api.github.com/repos/{REPO_NAME}/contents/{DB_FILE}"
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json",
@@ -93,15 +96,12 @@ def save_data_to_github(nama, no_anggota, nominal, keperluan, kategori, ttd_base
     else:
         raise Exception(f"Gagal push ke GitHub: {res.text}")
 
+# Ambil data kategori secara live dari GitHub
+data_saat_ini, _ = load_data_from_github()
+categories_list = data_saat_ini["categories"]
+
 st.title("🏛️ Pengajuan Pinjaman Koperasi")
 st.write("Silakan isi formulir di bawah ini dengan lengkap dan benar.")
-
-# Mengambil list kategori secara real-time dari GitHub
-try:
-    data_saat_ini, _ = load_data_from_github()
-    categories_list = data_saat_ini["categories"]
-except Exception:
-    categories_list = TEMPLATE_AWAL["categories"]
 
 # 1. FORMULIR INPUT DATA ANGGOTA KOPERASI
 with st.form("form_pinjaman"):
@@ -129,7 +129,7 @@ with st.form("form_pinjaman"):
     
     submit_button = st.form_submit_button("Kirim Pengajuan")
 
-# 2. PROSES SIMPAN LANGSUNG KE GITHUB
+# 2. PROSES UPDATE OTOMATIS KE GITHUB
 if submit_button:
     kategori_final = kategori_baru.strip() if kategori_baru.strip() else kategori
     
@@ -146,11 +146,11 @@ if submit_button:
                 img.save(buffered, format="PNG")
                 img_str = base64.b64encode(buffered.getvalue()).decode()
                 
-                # Eksekusi simpan & push otomatis ke GitHub via API
+                # Eksekusi simpan & sync langsung ke GitHub menggunakan token aman Anda
                 sukses = save_data_to_github(nama.strip(), no_anggota.strip(), nominal, keperluan.strip(), kategori_final.strip(), img_str)
                 
                 if sukses:
-                    st.success("✅ Sukses! Data pengajuan berhasil dikirim dan diperbarui di GitHub.")
+                    st.success("✅ Sukses! Data pendaftaran Anda berhasil dikunci ke GitHub data_store.json!")
                     st.rerun()
                 
             except Exception as e:

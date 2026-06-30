@@ -126,6 +126,14 @@
             "password": "123",
             "status_akun": "Aktif",
             "password_baru": ""
+        },
+        {
+            "username": "rpu lt 1",
+            "nama": "ratih",
+            "role": "Kepala Divisi",
+            "password": "123",
+            "status_akun": "Aktif",
+            "password_baru": ""
         }
     ]
 }

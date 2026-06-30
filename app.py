@@ -127,7 +127,6 @@ else:
             st.write("---")
             st.write("**Pernyataan:** Dengan menandatangani di bawah ini, saya menyatakan data di atas adalah benar.")
             
-            # Kanvas Tanda Tangan
             canvas_result = st_canvas(
                 fill_color="rgba(255, 255, 255, 0)", 
                 stroke_width=3,
@@ -154,7 +153,6 @@ else:
                         img.save(buffered, format="PNG")
                         img_str = base64.b64encode(buffered.getvalue()).decode()
                         
-                        # Paket data awal masuk
                         data_baru = {
                             "nama": nama.strip(),
                             "no_anggota": no_anggota.strip(),
@@ -167,14 +165,9 @@ else:
                         
                         data_saat_ini["database"].append(data_baru)
                         
-                        sukses = push_database_to_github(
-                            data_saat_ini, 
-                            sha_saat_ini, 
-                            f"Pengajuan baru: {nama.strip()}"
-                        )
-                        
+                        sukses = push_database_to_github(data_saat_ini, sha_saat_ini, f"Pengajuan baru: {nama.strip()}")
                         if sukses:
-                            st.success("✅ Sukses! Pengajuan berhasil dikirim dan menunggu verifikasi.")
+                            st.success("✅ Sukses! Pengajuan berhasil dikirim.")
                             st.rerun()
                         else:
                             st.error("Gagal menyimpan ke database GitHub.")
@@ -187,7 +180,8 @@ else:
     elif role == "Kepala Divisi":
         st.subheader("☑️ Daftar Pengajuan Masuk (Verifikasi Kepala Divisi)")
         
-        pengajuan_divisi = [item for item in data_saat_ini["database"] if item["status"] == "Menunggu Persetujuan Kepala Divisi"]
+        # PENGAMAN: Menggunakan .get("status") agar data lama tidak bikin crash
+        pengajuan_divisi = [item for item in data_saat_ini["database"] if item.get("status", "Menunggu Persetujuan Kepala Divisi") == "Menunggu Persetujuan Kepala Divisi"]
         
         if not pengajuan_divisi:
             st.info("Belum ada pengajuan yang memerlukan verifikasi Kepala Divisi.")
@@ -207,9 +201,8 @@ else:
                         st.text("Gagal memuat gambar tanda tangan.")
                         
                     if st.button("Setujui Pengajuan Ini", key=f"app1_{idx}"):
-                        # Update status ke tahap selanjutnya
                         for original_item in data_saat_ini["database"]:
-                            if original_item["no_anggota"] == item["no_anggota"] and original_item["status"] == "Menunggu Persetujuan Kepala Divisi":
+                            if original_item["no_anggota"] == item["no_anggota"] and original_item.get("status", "Menunggu Persetujuan Kepala Divisi") == "Menunggu Persetujuan Kepala Divisi":
                                 original_item["status"] = "Menunggu Persetujuan Kepala Bidang"
                                 break
                         
@@ -223,7 +216,7 @@ else:
     elif role == "Kepala Bidang":
         st.subheader("☑️ Daftar Verifikasi Kepala Bidang")
         
-        pengajuan_kabid = [item for item in data_saat_ini["database"] if item["status"] == "Menunggu Persetujuan Kepala Bidang"]
+        pengajuan_kabid = [item for item in data_saat_ini["database"] if item.get("status") == "Menunggu Persetujuan Kepala Bidang"]
         
         if not pengajuan_kabid:
             st.info("Tidak ada data yang menunggu verifikasi Kepala Bidang.")
@@ -236,7 +229,7 @@ else:
                     
                     if st.button("Setujui Pengajuan Ini (Kabid)", key=f"app2_{idx}"):
                         for original_item in data_saat_ini["database"]:
-                            if original_item["no_anggota"] == item["no_anggota"] and original_item["status"] == "Menunggu Persetujuan Kepala Bidang":
+                            if original_item["no_anggota"] == item["no_anggota"] and original_item.get("status") == "Menunggu Persetujuan Kepala Bidang":
                                 original_item["status"] = "Menunggu Persetujuan Direktur"
                                 break
                                 
@@ -250,7 +243,7 @@ else:
     elif role == "Direktur":
         st.subheader("☑️ Daftar Verifikasi Direktur")
         
-        pengajuan_dir = [item for item in data_saat_ini["database"] if item["status"] == "Menunggu Persetujuan Direktur"]
+        pengajuan_dir = [item for item in data_saat_ini["database"] if item.get("status") == "Menunggu Persetujuan Direktur"]
         
         if not pengajuan_dir:
             st.info("Tidak ada data yang menunggu verifikasi Direktur.")
@@ -263,7 +256,7 @@ else:
                     
                     if st.button("Setujui Pengajuan Ini (Direktur)", key=f"app3_{idx}"):
                         for original_item in data_saat_ini["database"]:
-                            if original_item["no_anggota"] == item["no_anggota"] and original_item["status"] == "Menunggu Persetujuan Direktur":
+                            if original_item["no_anggota"] == item["no_anggota"] and original_item.get("status") == "Menunggu Persetujuan Direktur":
                                 original_item["status"] = "Menunggu ACC SDM"
                                 break
                                 
@@ -277,7 +270,7 @@ else:
     elif role == "SDM":
         st.subheader("🏁 Finalisasi ACC & Cetak PDF (SDM)")
         
-        pengajuan_sdm = [item for item in data_saat_ini["database"] if item["status"] == "Menunggu ACC SDM"]
+        pengajuan_sdm = [item for item in data_saat_ini["database"] if item.get("status") == "Menunggu ACC SDM"]
         
         if not pengajuan_sdm:
             st.info("Tidak ada pengajuan yang siap di-ACC.")
@@ -296,10 +289,9 @@ else:
                     except Exception:
                         pass
                         
-                    # Tombol ACC Final
                     if st.button("ACC Akhir & Selesai", key=f"acc_{idx}"):
                         for original_item in data_saat_ini["database"]:
-                            if original_item["no_anggota"] == item["no_anggota"] and original_item["status"] == "Menunggu ACC SDM":
+                            if original_item["no_anggota"] == item["no_anggota"] and original_item.get("status") == "Menunggu ACC SDM":
                                 original_item["status"] = "Sudah Di-ACC SDM"
                                 break
                                 
@@ -307,7 +299,6 @@ else:
                             st.success("✅ Dokumen telah di-ACC sepenuhnya!")
                             st.rerun()
                             
-                    # Tautan Cetak PDF Sederhana
                     st.write("---")
                     st.markdown("### 🖨️ Cetak Formulir")
                     pdf_data = f"Nama: {item['nama']}\nNominal: {item['nominal']}\nKeperluan: {item['keperluan']}\nStatus: ACC SEPENUHNYA OLEH SDM"

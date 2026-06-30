@@ -5,6 +5,7 @@ import json
 import base64
 import io
 import requests
+import time
 
 st.set_page_config(page_title="Sistem Approval Berjenjang Koperasi", layout="centered")
 
@@ -21,15 +22,11 @@ except Exception:
 DB_FILE = "data_store.json"
 TEMPLATE_AWAL = {"database": [], "categories": ["Pinjaman Rutin", "Pinjaman Darurat", "Pinjaman Modal Usaha"]}
 
-# --- 🛠️ PERBAIKAN FUNGSI: Konversi Canvas ke Base64 (Anti Gagal) ---
+# --- Fungsi Helper: Konversi Canvas ke Base64 ---
 def canvas_to_base64(canvas_data):
     if canvas_data is not None:
         try:
-            # Mengonversi array canvas langsung menjadi gambar RGBA
             img = Image.fromarray(canvas_data.astype('uint8'), 'RGBA')
-            
-            # Cek apakah gambar benar-benar ada goresan (tidak blank transparan)
-            # Menghitung bounding box dari objek non-transparan
             if img.getbbox() is not None:
                 buffered = io.BytesIO()
                 img.save(buffered, format="PNG")
@@ -76,10 +73,14 @@ def push_database_to_github(updated_data, sha_lama, message):
 data_saat_ini, sha_saat_ini = load_data_from_github()
 
 # =========================================================================
-# 🔑 LOGIN SYSTEM
+# 🔑 LOGIN SYSTEM & SESSION STATE
 # =========================================================================
 st.sidebar.title("🔐 Login Pejabat")
 role = st.sidebar.selectbox("Pilih Role", ["User Biasa", "Kepala Divisi", "Kepala Bidang", "Direktur", "SDM"])
+
+# Inisialisasi status simpan sementara untuk peninjauan
+if "preview_data" not in st.session_state:
+    st.session_state.preview_data = None
 
 login_sukses = False
 if role == "User Biasa": login_sukses = True
@@ -95,9 +96,12 @@ else:
     st.write("---")
 
     # ---------------------------------------------------------------------
-    # 📝 USER BIASA (PENGAJU)
+    # 📝 USER BIASA (PENGAJU) WITH PREVIEW FEATURE
     # ---------------------------------------------------------------------
     if role == "User Biasa":
+        st.subheader("📝 Formulir Pengajuan Pinjaman")
+        
+        # Form diisi normal, jika tombol ditekan hanya mengunci ke session_state (belum push ke git)
         with st.form("form_pengajuan"):
             nama = st.text_input("Nama Lengkap")
             no_anggota = st.text_input("No Anggota")
@@ -106,28 +110,44 @@ else:
             st.write("Tanda Tangan Pengaju:")
             cv_user = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=150, width=300, key="cv_user")
             
-            if st.form_submit_button("Kirim Pengajuan"):
+            cek_review = st.form_submit_button("🔍 Tinjau & Cek Data")
+            if cek_review:
                 ttd_user = canvas_to_base64(cv_user.image_data)
                 if not nama.strip() or not no_anggota.strip():
                     st.error("❌ Nama dan Nomor Anggota wajib diisi!")
                 elif not ttd_user:
-                    st.error("❌ Tanda tangan wajib diisi!")
+                    st.error("❌ Tanda tangan wajib disi!")
                 else:
-                    new_data = {
+                    # Simpan draft sementara ke memory
+                    st.session_state.preview_data = {
                         "nama": nama.strip(), 
                         "no_anggota": no_anggota.strip(), 
                         "nominal": nominal, 
                         "keperluan": keperluan.strip(),
                         "ttd_pengaju": ttd_user, 
                         "status": "Menunggu Divisi",
-                        "ttd_kadiv": "",
-                        "ttd_kabid": "",
-                        "ttd_direktur": ""
+                        "ttd_kadiv": "", "ttd_kabid": "", "ttd_direktur": ""
                     }
-                    data_saat_ini["database"].append(new_data)
-                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Baru: {nama}"):
-                        st.toast(f"💾 Notifikasi: Pengajuan baru atas nama {nama} berhasil disimpan ke server GitHub!", icon="💾")
-                        st.success("✅ Pengajuan berhasil dikirim!")
+
+        # KOTAK PREVIEW EDIT & FIX KIRIM
+        if st.session_state.preview_data is not None:
+            p = st.session_state.preview_data
+            st.warning("⚠️ **Konfirmasi Pratinjau Berkas Sebelum Dikirim**")
+            st.info(f"**Nama:** {p['nama']} | **No Anggota:** {p['no_anggota']} | **Nominal:** Rp {p['nominal']:,}\n\n**Keperluan:** {p['keperluan']}")
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("✏️ Edit Kembali Data"):
+                    st.session_state.preview_data = None
+                    st.rerun()
+            with c2:
+                if st.button("🚀 Data Sudah Yakin, Kirim Berkas!"):
+                    data_saat_ini["database"].append(p)
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Baru: {p['nama']}"):
+                        st.success(f"✅ Sukses! Pengajuan {p['nama']} terkirim ke Kepala Divisi.")
+                        st.toast("Data Berhasil Disimpan!", icon="💾")
+                        st.session_state.preview_data = None
+                        time.sleep(1.5)  # Kasih jeda waktu biar user sempat melihat info sukses sebelum reload
                         st.rerun()
 
     # ---------------------------------------------------------------------
@@ -139,8 +159,7 @@ else:
             st.info("Belum ada pengajuan baru yang memerlukan verifikasi Kepala Divisi.")
         for idx, item in enumerate(items):
             st.markdown(f"### 📋 Pengajuan: {item['nama']} — Rp {item['nominal']:,}")
-            st.write(f"**No Anggota:** {item['no_anggota']}")
-            st.write(f"**Keperluan:** {item['keperluan']}")
+            st.write(f"**No Anggota:** {item['no_anggota']} | **Keperluan:** {item['keperluan']}")
             st.write("**Silakan Tanda Tangan Kepala Divisi untuk Menyetujui:**")
             
             cv_div = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=150, width=300, key=f"cv_div_{idx}")
@@ -150,7 +169,6 @@ else:
                 if not ttd_div:
                     st.error("❌ Anda wajib tanda tangan sebelum menyetujui!")
                 else:
-                    # Proses Penguncian Data yang Presisi
                     berhasil_update = False
                     for d in data_saat_ini["database"]:
                         if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Divisi":
@@ -160,11 +178,10 @@ else:
                             break
                     
                     if berhasil_update and push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Kadiv: {item['nama']}"):
-                        st.toast(f"✅ Notifikasi: Persetujuan Kepala Divisi untuk {item['nama']} BERHASIL DISIMPAN!", icon="📝")
-                        st.success("✅ Berhasil disetujui! Dialihkan ke Kepala Bidang.")
+                        st.success("✅ Berhasil disetujui! Berkas digeser ke Kepala Bidang.")
+                        st.toast("Persetujuan Berhasil Disimpan!", icon="📝")
+                        time.sleep(1.5)
                         st.rerun()
-                    else:
-                        st.error("Gagal memperbarui database. Coba tandatangani ulang.")
             st.write("---")
 
     # ---------------------------------------------------------------------
@@ -175,8 +192,7 @@ else:
         if not items: st.info("Tidak ada data yang menunggu verifikasi Kepala Bidang.")
         for idx, item in enumerate(items):
             st.markdown(f"### 📋 Dari: {item['nama']} — Rp {item['nominal']:,}")
-            st.write(f"**No Anggota:** {item['no_anggota']}")
-            st.write(f"**Keperluan:** {item['keperluan']}")
+            st.write(f"**No Anggota:** {item['no_anggota']} | **Keperluan:** {item['keperluan']}")
             st.write("**Silakan Tanda Tangan Kepala Bidang:**")
             
             cv_bid = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=150, width=300, key=f"cv_bid_{idx}")
@@ -194,8 +210,9 @@ else:
                             berhasil_update = True
                             break
                     if berhasil_update and push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Kabid: {item['nama']}"):
-                        st.toast(f"✅ Notifikasi: Persetujuan Kepala Bidang untuk {item['nama']} BERHASIL DISIMPAN!", icon="💼")
                         st.success("✅ Berhasil disetujui Kabid! Dialihkan ke Direktur.")
+                        st.toast("Verifikasi Kabid Disimpan!", icon="💼")
+                        time.sleep(1.5)
                         st.rerun()
             st.write("---")
 
@@ -225,8 +242,9 @@ else:
                             berhasil_update = True
                             break
                     if berhasil_update and push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Direktur: {item['nama']}"):
-                        st.toast(f"🏛️ Notifikasi: Persetujuan Direktur untuk {item['nama']} BERHASIL DISIMPAN!", icon="🚀")
                         st.success("✅ Berhasil disetujui Direktur! Dialihkan ke SDM.")
+                        st.toast("Persetujuan Direktur Disimpan!", icon="🏛️")
+                        time.sleep(1.5)
                         st.rerun()
             st.write("---")
 
@@ -253,8 +271,10 @@ else:
                         d["status"] = "SELESAI"
                         break
                 if push_database_to_github(data_saat_ini, sha_saat_ini, f"Final ACC SDM: {item['nama']}"):
-                    st.toast(f"🏁 Notifikasi: Berkas {item['nama']} BERHASIL DISIMPAN & Status SELESAI!", icon="🎉")
-                    st.success("Proses Selesai dan disimpan!"); st.rerun()
+                    st.success("Proses Selesai dan disimpan secara permanen!"); 
+                    st.toast("Status Berkas: SELESAI!", icon="🎉")
+                    time.sleep(1.5)
+                    st.rerun()
             st.write("---")
 
         st.write("---")
@@ -271,7 +291,6 @@ else:
             with col2:
                 if st.button("🖨️ Cetak Berkas PDF", key=f"print_btn_{idx}"):
                     st.session_state.print_id = s['no_anggota']
-                    st.toast(f"🖨️ Membuka jendela cetak untuk {s['nama']}...", icon="📄")
 
             if st.session_state.print_id == s['no_anggota']:
                 st.write("---")

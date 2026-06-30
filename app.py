@@ -9,30 +9,30 @@ import io
 
 st.set_page_config(page_title="Form Pinjaman Koperasi", layout="centered")
 
-# 1. DEFINISI FILE STORAGE
-DATASTORE_FILE = "datastore.json"
+# NAMA FILE SESUAI PERMINTAAN MAS LIAN
+DATASTORE_FILE = "data_store.json"
 
-# Fungsi membaca data dari JSON (Supaya data lama tetap aman)
+# Fungsi Membaca Data (Mengamankan data yang sudah ada)
 def load_data():
     if os.path.exists(DATASTORE_FILE):
         try:
             with open(DATASTORE_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
-            return []  # Jika file rusak/kosong, kembalikan list kosong
+            return []  # Jika file kosongan/rusak, kembalikan list kosong
     return []
 
-# Fungsi menambahkan data baru tanpa menghapus data lama (APPEND SYSTEM)
+# Fungsi Menambah Data Baru ke Dalam File JSON (Sistem Append)
 def save_data(data_baru):
-    data_lama = load_data()          # Ambil data lama dulu
-    data_lama.append(data_baru)       # Masukkan data baru ke dalam list
+    data_lama = load_data()          # Ambil isi data lama
+    data_lama.append(data_baru)       # Tambah data baru ke baris paling bawah
     with open(DATASTORE_FILE, "w", encoding="utf-8") as f:
-        json.dump(data_lama, f, indent=4, ensure_ascii=False) # Tulis kembali semuanya
+        json.dump(data_lama, f, indent=4, ensure_ascii=False) # Kunci balik ke file
 
 st.title("🏛️ Pengajuan Pinjaman Koperasi")
-st.write("Isi formulir di bawah. Data dijamin aman dan masuk ke basis data.")
+st.write("Isi formulir di bawah. Data otomatis tersimpan langsung ke dalam file **data_store.json**.")
 
-# 2. FORMULIR INPUT DATA ANGGOTA
+# 1. FORMULIR INPUT DATA ANGGOTA
 with st.form("form_pinjaman", clear_on_submit=True):
     nama = st.text_input("Nama Lengkap Anggota")
     no_anggota = st.text_input("Nomor Anggota Koperasi")
@@ -42,7 +42,7 @@ with st.form("form_pinjaman", clear_on_submit=True):
     st.write("---")
     st.write("**Pernyataan:** Dengan menandatangani di bawah ini, saya menyatakan data di atas adalah benar.")
     
-    # KANVAS TANDA TANGAN TOUCHSCREEN
+    # KANVAS TANDA TANGAN TOUCHSCREEN / MOUSE
     canvas_result = st_canvas(
         fill_color="rgba(255, 255, 255, 0)", 
         stroke_width=3,
@@ -56,7 +56,7 @@ with st.form("form_pinjaman", clear_on_submit=True):
     
     submit_button = st.form_submit_button("Kirim Pengajuan")
 
-# 3. PROSES SIMPAN AMAN KE JSON SETELAH TOMBOL DIKLIK
+# 2. PROSES SIMPAN KE FILE data_store.json
 if submit_button:
     if not nama or not no_anggota:
         st.error("❌ Mohon isi Nama dan Nomor Anggota terlebih dahulu!")
@@ -64,36 +64,47 @@ if submit_button:
         st.error("❌ Tanda tangan wajib diisi!")
     else:
         try:
-            # Mengonversi coretan gambar TTD menjadi Teks Base64 agar menyatu di JSON
+            # Mengonversi coretan gambar TTD menjadi Teks Base64
             img = Image.fromarray(canvas_result.image_data.astype('uint8'), 'RGBA')
             buffered = io.BytesIO()
             img.save(buffered, format="PNG")
             img_str = base64.b64encode(buffered.getvalue()).decode()
             
-            # Gabungkan semua data menjadi satu paket
+            # Buat struktur objek datanya
             entri_baru = {
                 "nama": nama,
                 "no_anggota": no_anggota,
                 "nominal": int(nominal),
                 "keperluan": keperluan,
-                "tanda_tangan_base64": img_str  # TTD aman menyatu di dalam berkas JSON
+                "tanda_tangan_base64": img_str  # TTD menyatu dalam teks JSON
             }
             
-            # Eksekusi simpan tanpa hapus data lama
+            # Eksekusi sistem append
             save_data(entri_baru)
-            st.success("✅ Pengajuan berhasil dikunci secara permanen ke datastore.json!")
+            st.success("✅ Sukses! Data pendaftaran berhasil dikunci ke data_store.json!")
             
         except Exception as e:
             st.error(f"Terjadi kesalahan sistem: {e}")
 
-# 4. MONITOR DATA (Hanya untuk melihat riwayat data yang masuk di bawah halaman)
+# 3. MENGINTIP ISI FILE data_store.json LANGSUNG DI BAWAH HALAMAN WEB
 st.write("---")
-st.subheader("📊 Log Riwayat Pengajuan (Database JSON)")
+st.subheader("📂 Isi File `data_store.json` (Muncul di Sini):")
+
 data_tercatat = load_data()
 
 if data_tercatat:
-    # Tampilkan rangkuman teks ke dalam tabel Streamlit
-    df_tampil = pd.DataFrame(data_tercatat)[["nama", "no_anggota", "nominal", "keperluan"]]
-    st.dataframe(df_tampil)
+    # Mengubah format objek python menjadi string teks teks JSON rapi
+    json_string = json.dumps(data_tercatat, indent=4, ensure_ascii=False)
+    
+    # Menampilkan teks mentah JSON dalam kotak kode di web Streamlit
+    st.code(json_string, language="json")
+    
+    # Tombol instan untuk download file JSON langsung ke komputer/HP Anda dari browser
+    st.download_button(
+        label="📥 Download File data_store.json",
+        data=json_string,
+        file_name="data_store.json",
+        mime="application/json"
+    )
 else:
-    st.info("Belum ada data pengajuan yang tersimpan di datastore.json.")
+    st.info("Belum ada data pengajuan yang masuk. File data_store.json masih kosong.")

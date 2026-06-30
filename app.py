@@ -21,15 +21,15 @@ except Exception:
 
 DB_FILE = "data_store.json"
 
-# Template awal database disesuaikan dengan daftar pejabat per lantai & Master Password 123456 untuk SDM
+# Template awal daftar lantai/bagian yang bisa login
 TEMPLATE_AWAL = {
     "database": [],
-    "users": [
-        {"username": "lt1_ratih", "nama": "Ratih (Lt 1)", "role": "Kepala Divisi", "password": "123", "status_akun": "Aktif", "password_baru": ""},
-        {"username": "lt2_fitri", "nama": "Fitri (Lt 2)", "role": "Kepala Divisi", "password": "123", "status_akun": "Aktif", "password_baru": ""},
-        {"username": "lt3_aisyah", "nama": "Aisyah (Lt 3)", "role": "Kepala Divisi", "password": "123", "status_akun": "Aktif", "password_baru": ""},
-        {"username": "lt4_hesti", "nama": "Hesti (Lt 4)", "role": "Kepala Divisi", "password": "123", "status_akun": "Aktif", "password_baru": ""},
-        {"username": "lt5_nuni", "nama": "Nuni (Lt 5)", "role": "Kepala Divisi", "password": "123", "status_akun": "Aktif", "password_baru": ""}
+    "daftar_lantai": [
+        {"nama_lantai": "Lantai 1", "password": "123", "status_akun": "Aktif", "password_baru": ""},
+        {"nama_lantai": "Lantai 2", "password": "123", "status_akun": "Aktif", "password_baru": ""},
+        {"nama_lantai": "Lantai 3", "password": "123", "status_akun": "Aktif", "password_baru": ""},
+        {"nama_lantai": "Lantai 4", "password": "123", "status_akun": "Aktif", "password_baru": ""},
+        {"nama_lantai": "Lantai 5", "password": "123", "status_akun": "Aktif", "password_baru": ""}
     ]
 }
 
@@ -58,7 +58,7 @@ def load_data_from_github():
             try:
                 data = json.loads(content_decoded)
                 if "database" not in data: data["database"] = []
-                if "users" not in data: data["users"] = TEMPLATE_AWAL["users"]
+                if "daftar_lantai" not in data: data["daftar_lantai"] = TEMPLATE_AWAL["daftar_lantai"]
                 return data, file_content["sha"]
             except Exception:
                 return TEMPLATE_AWAL, file_content.get("sha", None)
@@ -87,44 +87,44 @@ data_saat_ini, sha_saat_ini = load_data_from_github()
 st.sidebar.title("🏛️ Akses Sistem")
 menu_login = st.sidebar.radio("Menu Akses", ["Masuk Aplikasi", "Lupa / Reset Password"])
 
-user_aktif = None
+lantai_aktif = None
 role_aktif = "User Biasa"
 
 if "preview_data" not in st.session_state:
     st.session_state.preview_data = None
 
 if menu_login == "Masuk Aplikasi":
-    role_pilihan = st.sidebar.selectbox("Pilih Opsi Login", ["User Biasa (Pengaju)", "Kepala Divisi (Lt 1 s/d 5)", "SDM (Admin Pusat)"])
+    role_pilihan = st.sidebar.selectbox("Pilih Opsi Login", ["User Biasa (Pengaju)", "Kepala Divisi (Lantai)", "SDM (Admin Pusat)"])
     
     if role_pilihan == "User Biasa (Pengaju)":
         role_aktif = "User Biasa"
     
-    elif role_pilihan == "Kepala Divisi (Lt 1 s/d 5)":
-        username_input = st.sidebar.selectbox("Username Pejabat", [u["username"] for u in data_saat_ini["users"]])
+    elif role_pilihan == "Kepala Divisi (Lantai)":
+        lantai_pilih = st.sidebar.selectbox("Pilih Lantai Anda", [l["nama_lantai"] for l in data_saat_ini["daftar_lantai"]])
         password_input = st.sidebar.text_input("Password", type="password")
         
         if st.sidebar.button("Log In Kepala Divisi"):
             cocok = False
-            for u in data_saat_ini["users"]:
-                if u["username"] == username_input:
-                    if u["status_akun"] == "Menunggu Reset":
-                        st.sidebar.error("⚠️ Akun Anda terkunci! Menunggu persetujuan reset oleh SDM.")
+            for l in data_saat_ini["daftar_lantai"]:
+                if l["nama_lantai"] == lantai_pilih:
+                    if l["status_akun"] == "Menunggu Reset":
+                        st.sidebar.error("⚠️ Akun lantai ini terkunci! Menunggu persetujuan reset oleh SDM.")
                         cocok = True
                         break
-                    elif u["password"] == password_input:
-                        st.session_state.user_aktif = u
-                        st.sidebar.success(f"Selamat Datang, {u['nama']}")
+                    elif l["password"] == password_input:
+                        st.session_state.lantai_aktif = l["nama_lantai"]
+                        st.sidebar.success(f"Berhasil Login: {l['nama_lantai']}")
                         cocok = True
                         st.rerun()
             if not cocok and password_input:
                 st.sidebar.error("❌ Password salah.")
                 
-        if "user_aktif" in st.session_state:
-            user_aktif = st.session_state.user_aktif
+        if "lantai_aktif" in st.session_state:
+            lantai_aktif = st.session_state.lantai_aktif
             role_aktif = "Kepala Divisi"
-            st.sidebar.info(f"🔑 Logged in: {user_aktif['nama']}")
+            st.sidebar.info(f"🔑 Area Otoritas: **{lantai_aktif}**")
             if st.sidebar.button("🚪 Keluar (Logout)"):
-                del st.session_state.user_aktif
+                del st.session_state.lantai_aktif
                 st.rerun()
                 
     elif role_pilihan == "SDM (Admin Pusat)":
@@ -137,10 +137,10 @@ if menu_login == "Masuk Aplikasi":
 
 elif menu_login == "Lupa / Reset Password":
     st.subheader("🔑 Formulir Pengajuan Reset Password")
-    st.write("Lupa password? Masukkan username Anda dan buat password baru. Perubahan ini akan aktif setelah disetujui tim SDM.")
+    st.write("Lupa password akses lantai? Pilih lantai Anda dan buat password baru. Perubahan ini akan aktif setelah disetujui tim SDM.")
     
     with st.form("form_reset_pass"):
-        u_reset = st.selectbox("Pilih Username Anda", [u["username"] for u in data_saat_ini["users"]])
+        l_reset = st.selectbox("Pilih Lantai Anda", [l["nama_lantai"] for l in data_saat_ini["daftar_lantai"]])
         p_baru1 = st.text_input("Password Baru", type="password")
         p_baru2 = st.text_input("Ulangi Password Baru", type="password")
         
@@ -150,46 +150,51 @@ elif menu_login == "Lupa / Reset Password":
             elif p_baru1 != p_baru2:
                 st.error("❌ Konfirmasi password baru tidak cocok!")
             else:
-                for u in data_saat_ini["users"]:
-                    if u["username"] == u_reset:
-                        u["status_akun"] = "Menunggu Reset"
-                        u["password_baru"] = p_baru1
+                for l in data_saat_ini["daftar_lantai"]:
+                    if l["nama_lantai"] == l_reset:
+                        l["status_akun"] = "Menunggu Reset"
+                        l["password_baru"] = p_baru1
                         break
-                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Minta Reset: {u_reset}"):
-                    st.success("✅ Berhasil diajukan! Harap lapor ke tim SDM untuk membuka gembok akun.")
+                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Reset Lantai: {l_reset}"):
+                    st.success("✅ Berhasil diajukan! Harap lapor ke tim SDM untuk membuka gembok login.")
 
 # =========================================================================
 # 🏛️ HALAMAN UTAMA CORE PORTAL KOPERASI
 # =========================================================================
 st.title("🏛️ Portal Otomasi Koperasi Berjenjang")
-st.write(f"**Status Akses Saat Ini:** *{'User Pengaju (Anggota)' if role_aktif == 'User Biasa' else role_aktif}*")
+st.write(f"**Status Akses Saat Ini:** *{'User Pengaju (Anggota)' if role_aktif == 'User Biasa' else 'Pejabat ' + role_aktif}*")
 st.write("---")
 
 # ---------------------------------------------------------------------
-# 📝 USER BIASA (FORMULIR PENGAJUAN)
+# 📝 USER BIASA (FORMULIR PENGAJUAN + INPUT NAMA PEJABAT DI SINI)
 # ---------------------------------------------------------------------
 if role_aktif == "User Biasa":
     st.subheader("📝 Formulir Pengajuan Berkas Pinjaman")
     with st.form("form_pengajuan"):
-        nama = st.text_input("Nama Lengkap")
+        nama = st.text_input("Nama Lengkap Anggota Pemohon")
         no_anggota = st.text_input("No Anggota")
         
         c_lok1, c_lok2 = st.columns(2)
         with c_lok1:
-            lantai_asal = st.selectbox("Pilih Lantai Asal Pengaju", ["Lantai 1", "Lantai 2", "Lantai 3", "Lantai 4", "Lantai 5"])
+            lantai_asal = st.selectbox("Pilih Lantai Asal Pengaju", [l["nama_lantai"] for l in data_saat_ini["daftar_lantai"]])
         with c_lok2:
             unit = st.selectbox("Asal Unit / Bagian", ["IT", "Back Office", "HRD", "Keuangan", "Produksi", "Umum"])
             
+        st.markdown("---")
+        st.write("<b>👤 Input Pejabat yang Menyetujui (Pilih Area Anda):</b>", unsafe_allow_html=True)
+        nama_pejabat = st.text_input(f"Nama Kepala Divisi / Pejabat Terkait", placeholder="Masukkan nama pejabat yang bertugas di lantai tersebut...")
+
+        st.markdown("---")
         nominal = st.number_input("Nominal Pinjaman (Rp)", min_value=0, step=50000)
         keperluan = st.text_area("Keperluan / Alasan")
         
         col_ttd1, col_ttd2 = st.columns(2)
         with col_ttd1:
             st.write("✒️ **Tanda Tangan Pemohon:**")
-            cv_user = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=120, width=240, key="cv_user")
+            cv_user = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=110, width=220, key="cv_user")
         with col_ttd2:
             st.write("✒️ **Tanda Tangan Istri / Keluarga:**")
-            cv_keluarga = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=120, width=240, key="cv_keluarga")
+            cv_keluarga = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=110, width=220, key="cv_keluarga")
         
         cek_review = st.form_submit_button("🔍 Tinjau & Cek Data")
         if cek_review:
@@ -198,12 +203,15 @@ if role_aktif == "User Biasa":
             
             if not nama.strip() or not no_anggota.strip():
                 st.error("❌ Nama dan Nomor Anggota wajib diisi!")
+            elif not nama_pejabat.strip():
+                st.error("❌ Nama Pejabat yang menyetujui wajib diisi!")
             elif not ttd_user or not ttd_keluarga:
                 st.error("❌ Tanda tangan Pemohon & Keluarga wajib dilengkapi!")
             else:
                 st.session_state.preview_data = {
                     "nama": nama.strip(), "no_anggota": no_anggota.strip(), 
                     "lantai_asal": lantai_asal, "unit": unit,
+                    "nama_pejabat": nama_pejabat.strip(), # Nama pejabat tersimpan dinamis dari pengaju
                     "nominal": nominal, "keperluan": keperluan.strip(),
                     "ttd_pengaju": ttd_user, "ttd_keluarga": ttd_keluarga,
                     "status": "Menunggu Verifikasi Kepala Divisi", 
@@ -213,7 +221,7 @@ if role_aktif == "User Biasa":
     if st.session_state.preview_data is not None:
         p = st.session_state.preview_data
         st.warning("⚠️ **Konfirmasi Pratinjau Berkas Sebelum Dikirim**")
-        st.info(f"**Nama:** {p['nama']} ({p['lantai_asal']} - {p['unit']}) | **Nominal:** Rp {p['nominal']:,}")
+        st.info(f"**Nama Pemohon:** {p['nama']} ({p['lantai_asal']} - {p['unit']})\n\n**Verifikator:** {p['nama_pejabat']} | **Nominal:** Rp {p['nominal']:,}")
         
         c1, c2 = st.columns(2)
         with c1:
@@ -229,47 +237,37 @@ if role_aktif == "User Biasa":
                     time.sleep(1.2); st.rerun()
 
 # ---------------------------------------------------------------------
-# ✅ KEPALA DIVISI (OTORISASI OTOMATIS BERDASARKAN USERNAME LOGIN)
+# ✅ KEPALA DIVISI (OTORISASI LOGIN BERDASARKAN LANTAI YANG DIPILIH)
 # ---------------------------------------------------------------------
 elif role_aktif == "Kepala Divisi":
-    st.subheader(f"👋 Selamat Datang, Pejabat Divisi: {user_aktif['nama']}")
+    st.subheader(f"👋 Selamat Datang Pejabat Area: {lantai_aktif}")
+    st.info("Anda berwenang meng-ACC berkas pengajuan yang masuk untuk lantai Anda.")
     
-    # Menentukan lantai aktif berdasarkan username login yang dipilih
-    # Misal login username "lt1_ratih" maka hanya memproses lantai "Lantai 1"
-    mapping_lantai = {
-        "lt1_ratih": "Lantai 1",
-        "lt2_fitri": "Lantai 2",
-        "lt3_aisyah": "Lantai 3",
-        "lt4_hesti": "Lantai 4",
-        "lt5_nuni": "Lantai 5"
-    }
-    lantai_otoritas = mapping_lantai.get(user_aktif["username"], "")
-    
-    st.info(f"Otoritas Area Kerja Anda: **{lantai_otoritas}**")
-    
-    # Filter ketat hanya memunculkan data pengajuan dari lantai yang bersangkutan
+    # Filter ketat hanya memunculkan data pengajuan dari lantai yang login saat ini
     items = [
         i for i in data_saat_ini["database"] 
-        if i.get("status") == "Menunggu Verifikasi Kepala Divisi" and i.get("lantai_asal") == lantai_otoritas
+        if i.get("status") == "Menunggu Verifikasi Kepala Divisi" and i.get("lantai_asal") == lantai_aktif
     ]
     
     if not items: 
-        st.info(f"Bersih! Belum ada antrean berkas pinjaman masuk untuk area {lantai_otoritas}.")
+        st.info(f"Bersih! Belum ada antrean berkas pinjaman untuk area {lantai_aktif}.")
         
     for idx, item in enumerate(items):
+        # Menampilkan Nama Pejabat yang diinput pemohon bersangkutan di kartunya
         st.markdown(f"### 📋 Berkas: {item['nama']} — Unit: {item.get('unit')}")
-        st.write(f"**Nominal Pinjaman:** Rp {item['nominal']:,} | **Keperluan:** {item['keperluan']}")
+        st.write(f"**Diajukan ke (Nama Pejabat):** *{item.get('nama_pejabat', '-')}*")
+        st.write(f"**Nominal:** Rp {item['nominal']:,} | **Keperluan:** {item['keperluan']}")
         
         c_img1, c_img2 = st.columns(2)
         with c_img1:
             st.caption("Tanda Tangan Pemohon:")
-            st.image(base64.b64decode(item["ttd_pengaju"]), width=130)
+            st.image(base64.b64decode(item["ttd_pengaju"]), width=120)
         with c_img2:
             st.caption("Tanda Tangan Istri / Keluarga:")
-            st.image(base64.b64decode(item["ttd_keluarga"]), width=130)
+            st.image(base64.b64decode(item["ttd_keluarga"]), width=120)
             
-        st.write(f"**Tanda Tangan ACC Kepala Divisi {lantai_otoritas}:**")
-        cv_div = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=120, width=240, key=f"cv_div_{idx}")
+        st.write(f"**Tanda Tangan ACC Kepala Divisi ({lantai_aktif}):**")
+        cv_div = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=110, width=220, key=f"cv_div_{idx}")
         
         if st.button("✍️ Setujui & Teruskan Berkas", key=f"btn_div_{idx}"):
             ttd_div = canvas_to_base64(cv_div.image_data)
@@ -287,10 +285,10 @@ elif role_aktif == "Kepala Divisi":
         st.write("---")
 
 # ---------------------------------------------------------------------
-# ✅ SDM (ADMIN PUSAT: ACC FINAL, CETAK PDF, & MANAJEMEN USER)
+# ✅ SDM (ADMIN PUSAT: ACC FINAL, CETAK PDF, & EDIT BAGIAN LOGIN)
 # ---------------------------------------------------------------------
 elif role_aktif == "SDM":
-    tab1, tab2, tab3 = st.tabs(["📋 Berkas Selesai/ACC", "🔐 Reset Password", "👥 Manajemen Role Login Pejabat"])
+    tab1, tab2, tab3 = st.tabs(["📋 Berkas Selesai/ACC", "🔐 Reset Password Akses", "👥 Pengaturan Bagian Login (Lantai)"])
     
     # TAB 1: FINALISASI & CETAK PDF
     with tab1:
@@ -304,7 +302,6 @@ elif role_aktif == "SDM":
             st.markdown(f"### Berkas: {item['nama']} — Status Saat Ini: **{item['status']}**")
             st.write(f"**Lantai/Unit:** {item.get('lantai_asal')} ({item.get('unit')}) | **Rp {item['nominal']:,}**")
             
-            # Tombol percepat ACC langsung selesai (Simulasi pintasan Admin Pusat jika diperlukan)
             if st.button(f"🔒 Setujui / Nyatakan SELESAI ({item['nama']})", key=f"force_acc_{idx}"):
                 for d in data_saat_ini["database"]:
                     if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == item["status"]:
@@ -321,7 +318,9 @@ elif role_aktif == "SDM":
         
         for idx, s in enumerate(selesais):
             col1, col2 = st.columns([4, 2])
-            with col1: st.write(f"✅ **{s['nama']}** — {s.get('lantai_asal')} — Rp {s['nominal']:,}")
+            with col1: 
+                st.write(f"✅ **{s['nama']}** — {s.get('lantai_asal')} — Rp {s['nominal']:,}")
+                st.caption(f"Verifikator: {s.get('nama_pejabat', '-')}")
             with col2:
                 if st.button("🖨️ Buka Printer PDF", key=f"print_btn_{idx}"): st.session_state.print_id = s['no_anggota']
             
@@ -339,6 +338,7 @@ elif role_aktif == "SDM":
                         <tr><td><b>No Anggota</b></td><td>: {s['no_anggota']}</td></tr>
                         <tr><td><b>Nominal Dana</b></td><td>: <b>Rp {s['nominal']:,}</b></td></tr>
                         <tr><td><b>Keperluan</b></td><td>: {s['keperluan']}</td></tr>
+                        <tr><td><b>Kepala Divisi (ACC)</b></td><td>: {s.get('nama_pejabat', '-')}</td></tr>
                     </table>
                     <div style="display:table; width:100%; text-align:center; font-size:11px;">
                         <div style="display:table-row;">
@@ -374,75 +374,71 @@ elif role_aktif == "SDM":
                 """
                 st.components.v1.html(html_template, height=450, scrolling=True)
 
-    # TAB 2: RESET PASSWORD
+    # TAB 2: RESET PASSWORD AKSES LANTAI
     with tab2:
-        st.subheader("🔐 Permintaan Reset Password Pejabat")
-        pejabat_reset = [u for u in data_saat_ini["users"] if u.get("status_akun") == "Menunggu Reset"]
-        if not pejabat_reset: st.info("Aman! Tidak ada permintaan reset password.")
-        for u_pej in pejabat_reset:
-            st.warning(f"⚠️ **Username: {u_pej['username']}** — Nama: *{u_pej['nama']}*")
+        st.subheader("🔐 Permintaan Reset Password Akses Lantai")
+        lantai_reset = [l for l in data_saat_ini["daftar_lantai"] if l.get("status_akun") == "Menunggu Reset"]
+        if not lantai_reset: st.info("Aman! Tidak ada permintaan reset password.")
+        for l_item in lantai_reset:
+            st.warning(f"⚠️ **Akses Area / Lantai:** *{l_item['nama_lantai']}*")
             c_res1, c_res2 = st.columns(2)
             with c_res1:
-                if st.button(f"✅ Setujui Password Baru ({u_pej['username']})"):
-                    u_pej["password"] = u_pej["password_baru"]
-                    u_pej["password_baru"] = ""
-                    u_pej["status_akun"] = "Aktif"
-                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Approved Reset: {u_pej['username']}"):
-                        st.success("Password baru diaktifkan!"); time.sleep(1.2); st.rerun()
+                if st.button(f"✅ Setujui Password Baru ({l_item['nama_lantai']})"):
+                    l_item["password"] = l_item["password_baru"]
+                    l_item["password_baru"] = ""
+                    l_item["status_akun"] = "Aktif"
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Appr Reset: {l_item['nama_lantai']}"):
+                        st.success("Password akses baru diaktifkan!"); time.sleep(1.2); st.rerun()
             with c_res2:
-                if st.button(f"❌ Tolak Reset ({u_pej['username']})"):
-                    u_pej["password_baru"] = ""
-                    u_pej["status_akun"] = "Aktif"
-                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Tolak Reset: {u_pej['username']}"):
+                if st.button(f"❌ Tolak Reset ({l_item['nama_lantai']})"):
+                    l_item["password_baru"] = ""
+                    l_item["status_akun"] = "Aktif"
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Rej Reset: {l_item['nama_lantai']}"):
                         st.error("Reset dibatalkan."); time.sleep(1.2); st.rerun()
 
-    # TAB 3: TAMBAH / KURANGI ROLE PEJABAT LANGSUNG DARI APLIKASI
+    # TAB 3: TAMBAH / KURANGI AKSES LANTAI LANGSUNG DARI APLIKASI
     with tab3:
-        st.subheader("👥 Manajemen Akun Pejabat (Tambah / Kurang Role)")
+        st.subheader("👥 Pengaturan Area Login (Lantai / Bagian)")
         
-        # --- Form Tambah Akun ---
-        with st.form("form_tambah_user"):
-            st.write("<b>➕ Tambah Role Akun Baru</b>", unsafe_allow_html=True)
-            new_username = st.text_input("Username Baru (Tanpa spasi, misal: lt6_rully)")
-            new_nama = st.text_input("Nama Lengkap Pejabat")
+        # --- Form Tambah Lantai ---
+        with st.form("form_tambah_lantai"):
+            st.write("<b>➕ Tambah Akses Lantai / Bagian Baru</b>", unsafe_allow_html=True)
+            new_lantai = st.text_input("Nama Lantai / Unit Baru (Contoh: Lantai 6)")
             new_pass = st.text_input("Password Default", value="123")
             
-            if st.form_submit_button("Tambah Role Pejabat"):
-                if not new_username.strip() or not new_nama.strip():
-                    st.error("Username dan Nama wajib diisi!")
+            if st.form_submit_button("Tambahkan Akses Area"):
+                if not new_lantai.strip():
+                    st.error("Nama lantai atau bagian wajib diisi!")
                 else:
                     sudah_ada = False
-                    for u in data_saat_ini["users"]:
-                        if u["username"] == new_username.strip():
+                    for l in data_saat_ini["daftar_lantai"]:
+                        if l["nama_lantai"].lower() == new_lantai.strip().lower():
                             sudah_ada = True
                             break
                     
                     if sudah_ada:
-                        st.error("Username tersebut sudah terdaftar di sistem!")
+                        st.error("Akses area / lantai tersebut sudah terdaftar!")
                     else:
-                        data_saat_ini["users"].append({
-                            "username": new_username.strip(),
-                            "nama": new_nama.strip(),
-                            "role": "Kepala Divisi",
+                        data_saat_ini["daftar_lantai"].append({
+                            "nama_lantai": new_lantai.strip(),
                             "password": new_pass.strip(),
                             "status_akun": "Aktif",
                             "password_baru": ""
                         })
-                        if push_database_to_github(data_saat_ini, sha_saat_ini, f"Tambah User: {new_username}"):
-                            st.success(f"Role {new_username} berhasil ditambahkan!"); time.sleep(1.2); st.rerun()
+                        if push_database_to_github(data_saat_ini, sha_saat_ini, f"Tambah Lantai: {new_lantai}"):
+                            st.success(f"Akses {new_lantai} berhasil ditambahkan!"); time.sleep(1.2); st.rerun()
 
         st.write("---")
         
-        # --- Daftar Hapus Akun ---
-        st.write("<b>🗑️ Hapus / Kurangi Role Akun</b>", unsafe_allow_html=True)
-        for u_item in data_saat_ini["users"]:
-            col_u1, col_u2 = st.columns([4, 1])
-            with col_u1:
-                st.write(f"• **{u_item['username']}** — {u_item['nama']}")
-            with col_u2:
-                # Tombol Hapus dikunci sementara biar admin tidak salah klik
-                if st.button(f"Hapus", key=f"del_user_{u_item['username']}"):
-                    data_saat_ini["users"] = [u for u in data_saat_ini["users"] if u["username"] != u_item["username"]]
-                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Hapus User: {u_item['username']}"):
-                        st.toast(f"Akun {u_item['username']} telah dihapus")
+        # --- Daftar Hapus Lantai ---
+        st.write("<b>🗑️ Hapus / Kurangi Akses Area Login</b>", unsafe_allow_html=True)
+        for l_item in data_saat_ini["daftar_lantai"]:
+            col_l1, col_l2 = st.columns([4, 1])
+            with col_l1:
+                st.write(f"• **{l_item['nama_lantai']}** (Password: `{l_item['password']}`)")
+            with col_l2:
+                if st.button(f"Hapus", key=f"del_lantai_{l_item['nama_lantai']}"):
+                    data_saat_ini["daftar_lantai"] = [l for l in data_saat_ini["daftar_lantai"] if l["nama_lantai"] != l_item["nama_lantai"]]
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Hapus Lantai: {l_item['nama_lantai']}"):
+                        st.toast(f"Akses {l_item['nama_lantai']} telah dihapus")
                         time.sleep(1.2); st.rerun()

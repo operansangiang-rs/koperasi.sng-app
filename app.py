@@ -78,7 +78,6 @@ data_saat_ini, sha_saat_ini = load_data_from_github()
 st.sidebar.title("🔐 Login Pejabat")
 role = st.sidebar.selectbox("Pilih Role", ["User Biasa", "Kepala Divisi", "Kepala Bidang", "Direktur", "SDM"])
 
-# Inisialisasi status simpan sementara untuk peninjauan
 if "preview_data" not in st.session_state:
     st.session_state.preview_data = None
 
@@ -96,40 +95,49 @@ else:
     st.write("---")
 
     # ---------------------------------------------------------------------
-    # 📝 USER BIASA (PENGAJU) WITH PREVIEW FEATURE
+    # 📝 USER BIASA (PENGAJUAN) DENGAN TTD ISTRI / KELUARGA
     # ---------------------------------------------------------------------
     if role == "User Biasa":
         st.subheader("📝 Formulir Pengajuan Pinjaman")
         
-        # Form diisi normal, jika tombol ditekan hanya mengunci ke session_state (belum push ke git)
         with st.form("form_pengajuan"):
             nama = st.text_input("Nama Lengkap")
             no_anggota = st.text_input("No Anggota")
             nominal = st.number_input("Nominal Pinjaman", min_value=0, step=50000)
             keperluan = st.text_area("Keperluan")
-            st.write("Tanda Tangan Pengaju:")
-            cv_user = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=150, width=300, key="cv_user")
+            
+            # Pembagian Kolom Tanda Tangan biar rapi berdampingan
+            col_ttd1, col_ttd2 = st.columns(2)
+            with col_ttd1:
+                st.write("✒️ **Tanda Tangan Pemohon:**")
+                cv_user = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=130, width=260, key="cv_user")
+            with col_ttd2:
+                st.write("✒️ **Tanda Tangan Istri / Keluarga:**")
+                cv_keluarga = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=130, width=260, key="cv_keluarga")
             
             cek_review = st.form_submit_button("🔍 Tinjau & Cek Data")
             if cek_review:
                 ttd_user = canvas_to_base64(cv_user.image_data)
+                ttd_keluarga = canvas_to_base64(cv_keluarga.image_data)
+                
                 if not nama.strip() or not no_anggota.strip():
                     st.error("❌ Nama dan Nomor Anggota wajib diisi!")
                 elif not ttd_user:
-                    st.error("❌ Tanda tangan wajib disi!")
+                    st.error("❌ Tanda tangan Pemohon wajib diisi!")
+                elif not ttd_keluarga:
+                    st.error("❌ Tanda tangan Istri / Keluarga wajib diisi!")
                 else:
-                    # Simpan draft sementara ke memory
                     st.session_state.preview_data = {
                         "nama": nama.strip(), 
                         "no_anggota": no_anggota.strip(), 
                         "nominal": nominal, 
                         "keperluan": keperluan.strip(),
                         "ttd_pengaju": ttd_user, 
+                        "ttd_keluarga": ttd_keluarga, # Menyimpan ttd keluarga
                         "status": "Menunggu Divisi",
                         "ttd_kadiv": "", "ttd_kabid": "", "ttd_direktur": ""
                     }
 
-        # KOTAK PREVIEW EDIT & FIX KIRIM
         if st.session_state.preview_data is not None:
             p = st.session_state.preview_data
             st.warning("⚠️ **Konfirmasi Pratinjau Berkas Sebelum Dikirim**")
@@ -147,7 +155,7 @@ else:
                         st.success(f"✅ Sukses! Pengajuan {p['nama']} terkirim ke Kepala Divisi.")
                         st.toast("Data Berhasil Disimpan!", icon="💾")
                         st.session_state.preview_data = None
-                        time.sleep(1.5)  # Kasih jeda waktu biar user sempat melihat info sukses sebelum reload
+                        time.sleep(1.5)
                         st.rerun()
 
     # ---------------------------------------------------------------------
@@ -160,8 +168,17 @@ else:
         for idx, item in enumerate(items):
             st.markdown(f"### 📋 Pengajuan: {item['nama']} — Rp {item['nominal']:,}")
             st.write(f"**No Anggota:** {item['no_anggota']} | **Keperluan:** {item['keperluan']}")
-            st.write("**Silakan Tanda Tangan Kepala Divisi untuk Menyetujui:**")
             
+            # Menampilkan TTD Pengaju dan Keluarga sebagai bahan pertimbangan Kadiv
+            c_img1, c_img2 = st.columns(2)
+            with c_img1:
+                st.caption("Tanda Tangan Pemohon:")
+                if item.get("ttd_pengaju"): st.image(base64.b64decode(item["ttd_pengaju"]), width=150)
+            with c_img2:
+                st.caption("Tanda Tangan Istri / Keluarga:")
+                if item.get("ttd_keluarga"): st.image(base64.b64decode(item["ttd_keluarga"]), width=150)
+                
+            st.write("**Silakan Tanda Tangan Kepala Divisi untuk Menyetujui:**")
             cv_div = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=150, width=300, key=f"cv_div_{idx}")
             
             if st.button("✍️ Setujui & Kirim Tanda Tangan", key=f"btn_div_{idx}"):
@@ -249,7 +266,7 @@ else:
             st.write("---")
 
     # ---------------------------------------------------------------------
-    # ✅ SDM (FINAL ACC & PRINT PDF LENGKAP DENGAN TTD)
+    # ✅ SDM (FINAL ACC & PRINT PDF LENGKAP)
     # ---------------------------------------------------------------------
     elif role == "SDM":
         if "print_id" not in st.session_state:
@@ -261,9 +278,13 @@ else:
             st.markdown(f"### 📋 Final ACC SDM: {item['nama']} — Rp {item['nominal']:,}")
             st.write(f"**No Anggota:** {item['no_anggota']} | **Keperluan:** {item['keperluan']}")
             
-            st.write("**Lembar Tanda Tangan Pengaju (Anggota):**")
-            if item.get("ttd_pengaju"):
-                st.image(base64.b64decode(item["ttd_pengaju"]), width=200)
+            c_sdm_img1, c_sdm_img2 = st.columns(2)
+            with c_sdm_img1:
+                st.write("**Tanda Tangan Pengaju:**")
+                if item.get("ttd_pengaju"): st.image(base64.b64decode(item["ttd_pengaju"]), width=180)
+            with c_sdm_img2:
+                st.write("**Tanda Tangan Istri/Keluarga:**")
+                if item.get("ttd_keluarga"): st.image(base64.b64decode(item["ttd_keluarga"]), width=180)
 
             if st.button("🔒 ACC FINAL & NYATAKAN SELESAI", key=f"btn_sdm_{idx}"):
                 for d in data_saat_ini["database"]:
@@ -300,6 +321,7 @@ else:
                 
                 st.info(f"Tekan tombol printer bawaan laptop/HP Anda untuk menyimpannya sebagai **Save as PDF**.")
                 
+                # Desain PDF Output (Menampilkan Lembar TTD Pemohon + Istri/Keluarga secara Berdampingan)
                 html_template = f"""
                 <div id="print-area" style="padding: 25px; border: 2px solid #333; font-family: Arial, sans-serif; background-color: white; color: black; max-width: 700px; margin: auto;">
                     <div style="text-align: center; border-bottom: 3px double #333; padding-bottom: 10px; margin-bottom: 20px;">
@@ -307,7 +329,7 @@ else:
                         <p style="margin: 5px 0 0 0; font-size: 13px;">Sistem Otomasi Verifikasi Berjenjang Elektronik</p>
                     </div>
                     
-                    <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 30px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 25px;">
                         <tr><td style="width: 30%; padding: 6px 0; font-weight: bold;">Nama Lengkap</td><td style="width: 70%;">: {s['nama']}</td></tr>
                         <tr><td style="padding: 6px 0; font-weight: bold;">Nomor Anggota</td><td>: {s['no_anggota']}</td></tr>
                         <tr><td style="padding: 6px 0; font-weight: bold;">Nominal Dana</td><td>: <b>Rp {s['nominal']:,}</b></td></tr>
@@ -315,31 +337,39 @@ else:
                         <tr><td style="padding: 6px 0; font-weight: bold;">Status Berkas</td><td>: <span style="background-color: #d4edda; color: #155724; padding: 2px 8px; border-radius: 4px; font-weight: bold;">VALID & SELESAI (ACC)</span></td></tr>
                     </table>
 
-                    <h4 style="margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">LEMBAR VERIFIKASI TANDA TANGAN DIGITAL</h4>
+                    <h4 style="margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">LEMBAR VERIFIKASI TANDA TANGAN DIGITAL</h4>
                     
-                    <div style="display: table; width: 100%; text-align: center; font-size: 12px; margin-top: 15px;">
+                    <div style="display: table; width: 100%; text-align: center; font-size: 11px;">
                         <div style="display: table-row;">
-                            <div style="display: table-cell; width: 50%; padding-bottom: 20px;">
+                            <div style="display: table-cell; width: 50%; padding-bottom: 15px;">
                                 <p style="margin: 0 0 5px 0; font-weight: bold;">1. Pihak Pengaju (Anggota)</p>
-                                <img src="data:image/png;base64,{s.get('ttd_pengaju', '')}" style="height: 80px; border: 1px dashed #ccc;" />
-                                <p style="margin: 5px 0 0 0; font-style: italic;">({s['nama']})</p>
+                                <img src="data:image/png;base64,{s.get('ttd_pengaju', '')}" style="height: 70px; border: 1px dashed #ccc;" />
+                                <p style="margin: 3px 0 0 0; font-style: italic;">({s['nama']})</p>
                             </div>
-                            <div style="display: table-cell; width: 50%; padding-bottom: 20px;">
-                                <p style="margin: 0 0 5px 0; font-weight: bold;">2. Kepala Divisi</p>
-                                {"<img src='data:image/png;base64," + s['ttd_kadiv'] + "' style='height: 80px; border: 1px dashed #ccc;' />" if s.get('ttd_kadiv') else "<p style='color:red;height:80px;line-height:80px;'>[Tanpa TTD]</p>"}
-                                <p style="margin: 5px 0 0 0; font-style: italic;">(Tim Verifikator I)</p>
+                            <div style="display: table-cell; width: 50%; padding-bottom: 15px;">
+                                <p style="margin: 0 0 5px 0; font-weight: bold;">2. Istri / Keluarga Pengaju</p>
+                                {"<img src='data:image/png;base64," + s['ttd_keluarga'] + "' style='height: 70px; border: 1px dashed #ccc;' />" if s.get('ttd_keluarga') else "<p style='color:red;height:70px;line-height:70px;'>[Tanpa TTD]</p>"}
+                                <p style="margin: 3px 0 0 0; font-style: italic;">(Penjamin Internal Keluarga)</p>
                             </div>
                         </div>
                         <div style="display: table-row;">
-                            <div style="display: table-cell; width: 50%;">
-                                <p style="margin: 0 0 5px 0; font-weight: bold;">3. Kepala Bidang</p>
-                                {"<img src='data:image/png;base64," + s['ttd_kabid'] + "' style='height: 80px; border: 1px dashed #ccc;' />" if s.get('ttd_kabid') else "<p style='color:red;height:80px;line-height:80px;'>[Tanpa TTD]</p>"}
-                                <p style="margin: 5px 0 0 0; font-style: italic;">(Tim Verifikator II)</p>
+                            <div style="display: table-cell; width: 50%; padding-bottom: 15px;">
+                                <p style="margin: 0 0 5px 0; font-weight: bold;">3. Kepala Divisi</p>
+                                {"<img src='data:image/png;base64," + s['ttd_kadiv'] + "' style='height: 70px; border: 1px dashed #ccc;' />" if s.get('ttd_kadiv') else "<p style='color:red;height:70px;line-height:70px;'>[Tanpa TTD]</p>"}
+                                <p style="margin: 3px 0 0 0; font-style: italic;">(Tim Verifikator I)</p>
                             </div>
+                            <div style="display: table-cell; width: 50%; padding-bottom: 15px;">
+                                <p style="margin: 0 0 5px 0; font-weight: bold;">4. Kepala Bidang</p>
+                                {"<img src='data:image/png;base64," + s['ttd_kabid'] + "' style='height: 70px; border: 1px dashed #ccc;' />" if s.get('ttd_kabid') else "<p style='color:red;height:70px;line-height:70px;'>[Tanpa TTD]</p>"}
+                                <p style="margin: 3px 0 0 0; font-style: italic;">(Tim Verifikator II)</p>
+                            </div>
+                        </div>
+                        <div style="display: table-row;">
+                            <div style="display: table-cell; width: 50%;"></div>
                             <div style="display: table-cell; width: 50%;">
-                                <p style="margin: 0 0 5px 0; font-weight: bold;">4. Direktur Koperasi</p>
-                                {"<img src='data:image/png;base64," + s['ttd_direktur'] + "' style='height: 80px; border: 1px dashed #ccc;' />" if s.get('ttd_direktur') else "<p style='color:red;height:80px;line-height:80px;'>[Tanpa TTD]</p>"}
-                                <p style="margin: 5px 0 0 0; font-style: italic;">(Pimpinan Tertinggi)</p>
+                                <p style="margin: 0 0 5px 0; font-weight: bold;">5. Direktur Koperasi</p>
+                                {"<img src='data:image/png;base64," + s['ttd_direktur'] + "' style='height: 70px; border: 1px dashed #ccc;' />" if s.get('ttd_direktur') else "<p style='color:red;height:70px;line-height:70px;'>[Tanpa TTD]</p>"}
+                                <p style="margin: 3px 0 0 0; font-style: italic;">(Pimpinan Tertinggi)</p>
                             </div>
                         </div>
                     </div>

@@ -21,14 +21,21 @@ except Exception:
 DB_FILE = "data_store.json"
 TEMPLATE_AWAL = {"database": [], "categories": ["Pinjaman Rutin", "Pinjaman Darurat", "Pinjaman Modal Usaha"]}
 
-# --- Fungsi Helper: Konversi Canvas ke Base64 ---
+# --- 🛠️ PERBAIKAN FUNGSI: Konversi Canvas ke Base64 (Anti Gagal) ---
 def canvas_to_base64(canvas_data):
     if canvas_data is not None:
-        if canvas_data.any():
+        try:
+            # Mengonversi array canvas langsung menjadi gambar RGBA
             img = Image.fromarray(canvas_data.astype('uint8'), 'RGBA')
-            buffered = io.BytesIO()
-            img.save(buffered, format="PNG")
-            return base64.b64encode(buffered.getvalue()).decode()
+            
+            # Cek apakah gambar benar-benar ada goresan (tidak blank transparan)
+            # Menghitung bounding box dari objek non-transparan
+            if img.getbbox() is not None:
+                buffered = io.BytesIO()
+                img.save(buffered, format="PNG")
+                return base64.b64encode(buffered.getvalue()).decode()
+        except Exception:
+            pass
     return None
 
 # --- Fungsi API GitHub ---
@@ -143,15 +150,21 @@ else:
                 if not ttd_div:
                     st.error("❌ Anda wajib tanda tangan sebelum menyetujui!")
                 else:
+                    # Proses Penguncian Data yang Presisi
+                    berhasil_update = False
                     for d in data_saat_ini["database"]:
-                        if d["no_anggota"] == item["no_anggota"] and d.get("status", "Menunggu Divisi") == "Menunggu Divisi":
+                        if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Divisi":
                             d["status"] = "Menunggu Bidang"
                             d["ttd_kadiv"] = ttd_div
+                            berhasil_update = True
                             break
-                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Kadiv: {item['nama']}"):
+                    
+                    if berhasil_update and push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Kadiv: {item['nama']}"):
                         st.toast(f"✅ Notifikasi: Persetujuan Kepala Divisi untuk {item['nama']} BERHASIL DISIMPAN!", icon="📝")
                         st.success("✅ Berhasil disetujui! Dialihkan ke Kepala Bidang.")
                         st.rerun()
+                    else:
+                        st.error("Gagal memperbarui database. Coba tandatangani ulang.")
             st.write("---")
 
     # ---------------------------------------------------------------------
@@ -173,12 +186,14 @@ else:
                 if not ttd_bid:
                     st.error("❌ Anda wajib tanda tangan!")
                 else:
+                    berhasil_update = False
                     for d in data_saat_ini["database"]:
-                        if d["no_anggota"] == item["no_anggota"] and d.get("status") == "Menunggu Bidang":
+                        if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Bidang":
                             d["status"] = "Menunggu Direktur"
                             d["ttd_kabid"] = ttd_bid
+                            berhasil_update = True
                             break
-                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Kabid: {item['nama']}"):
+                    if berhasil_update and push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Kabid: {item['nama']}"):
                         st.toast(f"✅ Notifikasi: Persetujuan Kepala Bidang untuk {item['nama']} BERHASIL DISIMPAN!", icon="💼")
                         st.success("✅ Berhasil disetujui Kabid! Dialihkan ke Direktur.")
                         st.rerun()
@@ -202,12 +217,14 @@ else:
                 if not ttd_dir:
                     st.error("❌ Anda wajib tanda tangan!")
                 else:
+                    berhasil_update = False
                     for d in data_saat_ini["database"]:
-                        if d["no_anggota"] == item["no_anggota"] and d.get("status") == "Menunggu Direktur":
+                        if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Direktur":
                             d["status"] = "Menunggu SDM"
                             d["ttd_direktur"] = ttd_dir
+                            berhasil_update = True
                             break
-                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Direktur: {item['nama']}"):
+                    if berhasil_update and push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Direktur: {item['nama']}"):
                         st.toast(f"🏛️ Notifikasi: Persetujuan Direktur untuk {item['nama']} BERHASIL DISIMPAN!", icon="🚀")
                         st.success("✅ Berhasil disetujui Direktur! Dialihkan ke SDM.")
                         st.rerun()
@@ -232,7 +249,7 @@ else:
 
             if st.button("🔒 ACC FINAL & NYATAKAN SELESAI", key=f"btn_sdm_{idx}"):
                 for d in data_saat_ini["database"]:
-                    if d["no_anggota"] == item["no_anggota"] and d.get("status") == "Menunggu SDM":
+                    if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu SDM":
                         d["status"] = "SELESAI"
                         break
                 if push_database_to_github(data_saat_ini, sha_saat_ini, f"Final ACC SDM: {item['nama']}"):
@@ -256,17 +273,14 @@ else:
                     st.session_state.print_id = s['no_anggota']
                     st.toast(f"🖨️ Membuka jendela cetak untuk {s['nama']}...", icon="📄")
 
-            # REVISI DI SINI: Jika print_id sesuai, munculkan tombol batal & pratinjau
             if st.session_state.print_id == s['no_anggota']:
                 st.write("---")
-                # Tombol Batal untuk menutup pratinjau sepenuhnya
                 if st.button("❌ Tutup / Batal Cetak", key=f"close_btn_{idx}"):
                     st.session_state.print_id = None
                     st.rerun()
                 
                 st.info(f"Tekan tombol printer bawaan laptop/HP Anda untuk menyimpannya sebagai **Save as PDF**.")
                 
-                # Desain Berkas Nota/Formulir HTML Resmi Koperasi Khusus Cetak
                 html_template = f"""
                 <div id="print-area" style="padding: 25px; border: 2px solid #333; font-family: Arial, sans-serif; background-color: white; color: black; max-width: 700px; margin: auto;">
                     <div style="text-align: center; border-bottom: 3px double #333; padding-bottom: 10px; margin-bottom: 20px;">
@@ -313,7 +327,6 @@ else:
                 </div>
                 
                 <script>
-                    // Otomatis mentrigger fungsi print jendela browser agar bisa save PDF langsung
                     setTimeout(function() {{
                         var printContents = document.getElementById('print-area').innerHTML;
                         var originalContents = document.body.innerHTML;
@@ -323,5 +336,4 @@ else:
                     }}, 1000);
                 </script>
                 """
-                # Tampilkan Preview Dokumen Resmi di Web Streamlit sebelum terdownload
                 st.components.v1.html(html_template, height=550, scrolling=True)

@@ -48,6 +48,8 @@ def canvas_to_base64(canvas_data):
 def load_data_from_github():
     if GITHUB_TOKEN.startswith("ghp_") and "/" in REPO_NAME:
         url = f"https://api.github.com/repos/{REPO_NAME}/contents/{DB_FILE}"
+        headers = {"Authorization": f"token GITHUB_TOKEN", "Accept": "application/vnd.github.v3+json"}
+        # Perbaikan otorisasi token github
         headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
@@ -79,7 +81,7 @@ def push_database_to_github(updated_data, sha_lama, message):
     res = requests.put(url, headers=headers, json=payload)
     return res.status_code in [200, 201]
 
-data_saat_ini, sha_saatini = load_data_from_github()
+data_saat_ini, sha_saat_ini = load_data_from_github()
 
 # =========================================================================
 # 🔑 LOGIN & RESET PASSWORD SYSTEM
@@ -117,7 +119,8 @@ if menu_login == "Masuk Aplikasi":
         }
         target_role = role_mapping[role_pilihan]
         
-        user_list = [u["username"] for u in data_saatini["users"] if u["role"] == target_role]
+        # Sinkronisasi variabel data_saat_ini
+        user_list = [u["username"] for u in data_saat_ini["users"] if u["role"] == target_role]
         
         if not user_list:
             st.sidebar.warning(f"Belum ada akun dengan role {target_role} terdaftar. Silakan buat via akun Admin terlebih dahulu.")
@@ -127,7 +130,7 @@ if menu_login == "Masuk Aplikasi":
             
             if st.sidebar.button("Log In"):
                 cocok = False
-                for u in data_saatini["users"]:
+                for u in data_saat_ini["users"]:
                     if u["username"] == username_pilih:
                         if u["status_akun"] == "Menunggu Reset":
                             st.sidebar.error("⚠️ Akun ini terkunci! Menunggu reset oleh Admin.")
@@ -162,7 +165,7 @@ elif menu_login == "Lupa / Reset Password":
     st.write("Lupa password akses akun? Pilih username Anda dan buat password baru. Perubahan ini akan aktif setelah disetujui tim Admin.")
     
     with st.form("form_reset_pass"):
-        u_reset = st.selectbox("Pilih Username Anda", [u["username"] for u in data_saatini["users"]])
+        u_reset = st.selectbox("Pilih Username Anda", [u["username"] for u in data_saat_ini["users"]])
         p_baru1 = st.text_input("Password Baru", type="password")
         p_baru2 = st.text_input("Ulangi Password Baru", type="password")
         
@@ -172,12 +175,12 @@ elif menu_login == "Lupa / Reset Password":
             elif p_baru1 != p_baru2:
                 st.error("❌ Konfirmasi password baru tidak cocok!")
             else:
-                for u in data_saatini["users"]:
+                for u in data_saat_ini["users"]:
                     if u["username"] == u_reset:
                         u["status_akun"] = "Menunggu Reset"
                         u["password_baru"] = p_baru1
                         break
-                if push_database_to_github(data_saatini, sha_saatini, f"Reset User: {u_reset}"):
+                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Reset User: {u_reset}"):
                     st.success("✅ Berhasil diajukan! Harap lapor ke tim Admin untuk membuka gembok akun.")
 
 # =========================================================================
@@ -199,7 +202,7 @@ if role_aktif == "User Biasa":
         st.markdown("---")
         st.write("<b>👤 Pilih Supervisor / Karu (Kepala Regu) Tujuan:</b>", unsafe_allow_html=True)
         
-        karu_list = [u["username"] for u in data_saatini["users"] if u["role"] == "Karu"]
+        karu_list = [u["username"] for u in data_saat_ini["users"] if u["role"] == "Karu"]
         if not karu_list:
             st.error("❌ Belum ada akun Karu (Kepala Regu) yang terdaftar di sistem! Harap hubungi Admin.")
             target_karu = ""
@@ -256,8 +259,8 @@ if role_aktif == "User Biasa":
                 st.rerun()
         with c2:
             if st.button("🚀 Data Sudah Yakin, Kirim Berkas!"):
-                data_saatini["database"].append(p)
-                if push_database_to_github(data_saatini, sha_saatini, f"Baru: {p['nama']}"):
+                data_saat_ini["database"].append(p)
+                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Baru: {p['nama']}"):
                     st.success(f"✅ Sukses! Pengajuan terkirim ke Karu: {p['target_karu']}.")
                     st.session_state.preview_data = None
                     time.sleep(1.2); st.rerun()
@@ -270,7 +273,7 @@ elif role_aktif == "Karu":
     st.info("Anda berwenang meng-ACC berkas pengajuan yang ditujukan langsung ke akun Anda.")
     
     items = [
-        i for i in data_saatini["database"] 
+        i for i in data_saat_ini["database"] 
         if i.get("status") == "Menunggu Verifikasi Karu" and i.get("target_karu") == user_login_aktif["username"]
     ]
     
@@ -301,12 +304,12 @@ elif role_aktif == "Karu":
             if not ttd_div:
                 st.error("❌ Tanda tangan wajib diisi sebelum verifikasi!")
             else:
-                for d in data_saatini["database"]:
+                for d in data_saat_ini["database"]:
                     if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Verifikasi Karu":
                         d["status"] = "Menunggu Bidang"
                         d["ttd_kadiv"] = ttd_div
                         break
-                if push_database_to_github(data_saatini, sha_saatini, f"Karu ACC: {item['nama']}"):
+                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Karu ACC: {item['nama']}"):
                     st.success("✅ Berhasil disetujui Karu! Berkas dilanjutkan ke Kepala Bidang (Kabid).")
                     time.sleep(1.2); st.rerun()
         st.write("---")
@@ -314,9 +317,9 @@ elif role_aktif == "Karu":
     # Bagian Transparansi Baca Seluruh Pengajuan
     st.markdown("---")
     st.subheader("👁️ Transparansi: Pemantauan Semua Pengajuan Berjalan")
-    if not data_saatini["database"]:
+    if not data_saat_ini["database"]:
         st.info("Belum ada data pengajuan sama sekali.")
-    for idx_all, db_item in enumerate(data_saatini["database"]):
+    for idx_all, db_item in enumerate(data_saat_ini["database"]):
         with st.expander(f"Berkas: {db_item['nama']} — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
             st.write(f"**Nama Pemohon:** {db_item['nama']} (No: {db_item['no_anggota']})")
             st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
@@ -329,7 +332,7 @@ elif role_aktif == "Karu":
 # ---------------------------------------------------------------------
 elif role_aktif == "Kabid":
     st.subheader("👋 Selamat Datang Kepala Bidang (Kabid)")
-    items_kabid = [i for i in data_saatini["database"] if i.get("status") == "Menunggu Bidang"]
+    items_kabid = [i for i in data_saat_ini["database"] if i.get("status") == "Menunggu Bidang"]
     
     if not items_kabid:
         st.info("Tidak ada berkas yang menunggu verifikasi Kabid saat ini.")
@@ -346,21 +349,21 @@ elif role_aktif == "Kabid":
             if not ttd_kabid:
                 st.error("❌ Tanda tangan wajib diisi sebelum verifikasi!")
             else:
-                for d in data_saatini["database"]:
+                for d in data_saat_ini["database"]:
                     if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Bidang":
                         d["status"] = "Menunggu Direktur"
                         d["ttd_kabid"] = ttd_kabid
                         break
-                if push_database_to_github(data_saatini, sha_saatini, f"Kabid ACC: {item['nama']}"):
+                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Kabid ACC: {item['nama']}"):
                     st.success("✅ Berhasil disetujui Kabid! Diteruskan ke Direktur."); time.sleep(1.2); st.rerun()
         st.write("---")
 
     # Bagian Transparansi Baca Seluruh Pengajuan
     st.markdown("---")
     st.subheader("👁️ Transparansi: Pemantauan Semua Pengajuan Berjalan")
-    if not data_saatini["database"]:
+    if not data_saat_ini["database"]:
         st.info("Belum ada data pengajuan sama sekali.")
-    for idx_all, db_item in enumerate(data_saatini["database"]):
+    for idx_all, db_item in enumerate(data_saat_ini["database"]):
         with st.expander(f"Berkas: {db_item['nama']} — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
             st.write(f"**Nama Pemohon:** {db_item['nama']} (No: {db_item['no_anggota']})")
             st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
@@ -373,7 +376,7 @@ elif role_aktif == "Kabid":
 # ---------------------------------------------------------------------
 elif role_aktif == "Direktur":
     st.subheader("👋 Selamat Datang Direktur Utama")
-    items_dir = [i for i in data_saatini["database"] if i.get("status") == "Menunggu Direktur"]
+    items_dir = [i for i in data_saat_ini["database"] if i.get("status") == "Menunggu Direktur"]
     
     if not items_dir:
         st.info("Tidak ada berkas yang menunggu ACC Direktur saat ini.")
@@ -390,21 +393,21 @@ elif role_aktif == "Direktur":
             if not ttd_dir:
                 st.error("❌ Tanda tangan wajib diisi sebelum verifikasi!")
             else:
-                for d in data_saatini["database"]:
+                for d in data_saat_ini["database"]:
                     if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Direktur":
                         d["status"] = "SELESAI"
                         d["ttd_direktur"] = ttd_dir
                         break
-                if push_database_to_github(data_saatini, sha_saatini, f"Direktur ACC: {item['nama']}"):
+                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Direktur ACC: {item['nama']}"):
                     st.success("✅ Pengajuan telah di-ACC Direktur dan SELESAI."); time.sleep(1.2); st.rerun()
         st.write("---")
 
     # Bagian Transparansi Baca Seluruh Pengajuan
     st.markdown("---")
     st.subheader("👁️ Transparansi: Pemantauan Semua Pengajuan Berjalan")
-    if not data_saatini["database"]:
+    if not data_saat_ini["database"]:
         st.info("Belum ada data pengajuan sama sekali.")
-    for idx_all, db_item in enumerate(data_saatini["database"]):
+    for idx_all, db_item in enumerate(data_saat_ini["database"]):
         with st.expander(f"Berkas: {db_item['nama']} — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
             st.write(f"**Nama Pemohon:** {db_item['nama']} (No: {db_item['no_anggota']})")
             st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
@@ -423,16 +426,16 @@ elif role_aktif == "SDM":
     
     with tab_sdm1:
         st.subheader("📑 Arsip Berkas Selesai (ACC Lengkap)")
-        selesais_sdm = [i for i in data_saatini["database"] if i.get("status") == "SELESAI"]
+        selesais_sdm = [i for i in data_saat_ini["database"] if i.get("status") == "SELESAI"]
         if not selesais_sdm: st.info("Belum ada arsip data yang berstatus selesai.")
         for s_item in selesais_sdm:
             st.write(f"• **{s_item['nama']}** — Rp {s_item['nominal']:,} (Karu: {s_item.get('target_karu')}) — Keperluan: {s_item['keperluan']}")
             
     with tab_sdm2:
         st.subheader("👁️ Transparansi: Pemantauan Seluruh Pengajuan Berjalan")
-        if not data_saatini["database"]:
+        if not data_saat_ini["database"]:
             st.info("Belum ada data pengajuan sama sekali.")
-        for idx_all, db_item in enumerate(data_saatini["database"]):
+        for idx_all, db_item in enumerate(data_saat_ini["database"]):
             with st.expander(f"Berkas: {db_item['nama']} — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
                 st.write(f"**Nama Pemohon:** {db_item['nama']} (No: {db_item['no_anggota']})")
                 st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
@@ -442,7 +445,7 @@ elif role_aktif == "SDM":
 
     with tab_sdm3:
         st.warning("⚠️ *Manajemen penambahan/pengurangan akun login diarahkan melalui login Super Admin (Admin Portal).*")
-        for u_item in data_saatini["users"]:
+        for u_item in data_saat_ini["users"]:
             st.write(f"• Username: **{u_item['username']}** | Role: *{u_item['role']}*")
 
 # ---------------------------------------------------------------------
@@ -455,23 +458,23 @@ elif role_aktif == "Admin":
     
     with tab1:
         st.subheader("🔓 Berkas Dalam Antrean Berjenjang (Bypass)")
-        items_all = [i for i in data_saatini["database"] if i.get("status") != "SELESAI"]
+        items_all = [i for i in data_saat_ini["database"] if i.get("status") != "SELESAI"]
         if not items_all: st.info("Semua berkas pengajuan sudah berstatus SELESAI.")
         
         for idx, it in enumerate(items_all):
             st.write(f"• **{it['nama']}** — Karu Tujuan: *{it.get('target_karu')}* — Status: *{it['status']}*")
             if st.button(f"Selesaikan Paksa ({it['nama']})", key=f"force_done_{idx}"):
-                for d in data_saatini["database"]:
+                for d in data_saat_ini["database"]:
                     if str(d["no_anggota"]).strip() == str(it["no_anggota"]).strip() and d.get("status") == it["status"]:
                         d["status"] = "SELESAI"
                         break
-                if push_database_to_github(data_saatini, sha_saatini, f"Bypass Admin: {it['nama']}"):
+                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Bypass Admin: {it['nama']}"):
                     st.success("Berkas dipaksa SELESAI."); time.sleep(1.2); st.rerun()
             st.write("---")
 
     with tab2:
         st.subheader("🖨️ Arsip Berkas Selesai (Cetak PDF Resmi)")
-        selesais = [i for i in data_saatini["database"] if i.get("status") == "SELESAI"]
+        selesais = [i for i in data_saat_ini["database"] if i.get("status") == "SELESAI"]
         if "print_id" not in st.session_state: st.session_state.print_id = None
         
         for idx, s in enumerate(selesais):
@@ -534,9 +537,9 @@ elif role_aktif == "Admin":
 
     with tab3:
         st.subheader("👁️ Transparansi: Pemantauan Seluruh Berkas Pengajuan")
-        if not data_saatini["database"]:
+        if not data_saat_ini["database"]:
             st.info("Belum ada data pengajuan sama sekali.")
-        for idx_all, db_item in enumerate(data_saatini["database"]):
+        for idx_all, db_item in enumerate(data_saat_ini["database"]):
             with st.expander(f"Berkas: {db_item['nama']} — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
                 st.write(f"**Nama Pemohon:** {db_item['nama']} (No: {db_item['no_anggota']})")
                 st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
@@ -546,7 +549,7 @@ elif role_aktif == "Admin":
 
     with tab4:
         st.subheader("🔐 Permintaan Reset Password Akun")
-        user_reset = [u for u in data_saatini["users"] if u.get("status_akun") == "Menunggu Reset"]
+        user_reset = [u for u in data_saat_ini["users"] if u.get("status_akun") == "Menunggu Reset"]
         if not user_reset: st.info("Aman! Tidak ada permintaan reset password.")
         for u_item in user_reset:
             st.warning(f"⚠️ **Username:** *{u_item['username']}* (Role: {u_item['role']})")
@@ -556,13 +559,13 @@ elif role_aktif == "Admin":
                     u_item["password"] = u_item["password_baru"]
                     u_item["password_baru"] = ""
                     u_item["status_akun"] = "Aktif"
-                    if push_database_to_github(data_saatini, sha_saatini, f"Appr Reset: {u_item['username']}"):
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Appr Reset: {u_item['username']}"):
                         st.success("Password akses baru diaktifkan!"); time.sleep(1.2); st.rerun()
             with c_res2:
                 if st.button(f"❌ Tolak Reset ({u_item['username']})"):
                     u_item["password_baru"] = ""
                     u_item["status_akun"] = "Aktif"
-                    if push_database_to_github(data_saatini, sha_saatini, f"Rej Reset: {u_item['username']}"):
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Rej Reset: {u_item['username']}"):
                         st.error("Reset dibatalkan."); time.sleep(1.2); st.rerun()
 
     with tab5:
@@ -578,7 +581,7 @@ elif role_aktif == "Admin":
                     st.error("Username wajib diisi!")
                 else:
                     sudah_ada = False
-                    for u in data_saatini["users"]:
+                    for u in data_saat_ini["users"]:
                         if u["username"].lower() == new_username.strip().lower():
                             sudah_ada = True
                             break
@@ -586,25 +589,25 @@ elif role_aktif == "Admin":
                     if sudah_ada:
                         st.error("Username tersebut sudah terdaftar!")
                     else:
-                        data_saatini["users"].append({
+                        data_saat_ini["users"].append({
                             "username": new_username.strip(),
                             "role": new_role,
                             "password": new_pass.strip(),
                             "status_akun": "Aktif",
                             "password_baru": ""
                         })
-                        if push_database_to_github(data_saatini, sha_saatini, f"Tambah User: {new_username}"):
+                        if push_database_to_github(data_saat_ini, sha_saat_ini, f"Tambah User: {new_username}"):
                             st.success(f"Akun {new_username} dengan role {new_role} berhasil ditambahkan!"); time.sleep(1.2); st.rerun()
 
         st.write("---")
         st.write("<b>🗑️ Hapus / Kurangi Akun Akses</b>", unsafe_allow_html=True)
-        for u_item in data_saatini["users"]:
+        for u_item in data_saat_ini["users"]:
             col_u1, col_u2 = st.columns([4, 1])
             with col_u1:
                 st.write(f"• **{u_item['username']}** — (Role: *{u_item['role']}* | Pass: `{u_item['password']}`)")
             with col_u2:
                 if st.button(f"Hapus", key=f"del_user_{u_item['username']}"):
-                    data_saatini["users"] = [u for u in data_saatini["users"] if u["username"] != u_item["username"]]
-                    if push_database_to_github(data_saatini, sha_saatini, f"Hapus User: {u_item['username']}"):
+                    data_saat_ini["users"] = [u for u in data_saat_ini["users"] if u["username"] != u_item["username"]]
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Hapus User: {u_item['username']}"):
                         st.toast(f"Akun {u_item['username']} telah dihapus")
                         time.sleep(1.2); st.rerun()

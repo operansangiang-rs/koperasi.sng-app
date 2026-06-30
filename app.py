@@ -283,9 +283,14 @@ elif role_aktif == "Karu":
         st.markdown("### 📋 Berkas Pengajuan Masuk")
         st.success(f"Diajukan Kepada Anda (Karu Tujuan): **{item.get('target_karu')}**")
         
-        st.write(f"**Nama Pemohon:** {item['nama']} (No Anggota: {item['no_anggota']})")
-        st.write(f"**Penjamin (Istri/Saudara):** **{item.get('nama_istri_saudara', '-')}**")
-        st.write(f"**Nominal:** Rp {item['nominal']:,} | **Keperluan:** {item['keperluan']}")
+        # --- Rincian Informasi Pemohon & Keperluan ---
+        st.markdown("#### 📌 Rincian Pemohon")
+        st.write(f"**Nama Pemohon:** {item['nama']}")
+        st.write(f"**No Anggota:** {item['no_anggota']}")
+        st.write(f"**Nominal Pinjaman:** **Rp {item['nominal']:,}**")
+        st.write(f"**Keperluan / Alasan:** {item['keperluan']}")
+        st.write(f"**Penjamin (Istri/Saudara):** {item.get('nama_istri_saudara', '-')}")
+        st.markdown("---")
         
         c_img1, c_img2 = st.columns(2)
         with c_img1:

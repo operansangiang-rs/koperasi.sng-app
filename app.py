@@ -94,26 +94,34 @@ if "preview_data" not in st.session_state:
     st.session_state.preview_data = None
 
 if menu_login == "Masuk Aplikasi":
-    role_pilihan = st.sidebar.selectbox("Pilih Opsi Login", ["User", "Karu (Kepala Regu)", "Kabid", "Direktur", "SDM", "Admin"])
+    role_pilihan = st.sidebar.selectbox("Pilih Opsi Login", ["User", "Karu (Kepala Regu)", "Kabid", "Direktur", "SDM", "Admin Portal"])
     
     if role_pilihan == "User":
         role_aktif = "User Biasa"
+        
+    elif role_pilihan == "Admin Portal":
+        # Akses Super Admin dengan password default 321
+        pass_admin = st.sidebar.text_input("Password Super Admin", type="password")
+        if pass_admin == "321":
+            role_aktif = "Admin"
+            user_login_aktif = {"username": "admin", "role": "Admin"}
+            st.sidebar.success("🔑 Akses Super Admin Diberikan")
+        elif pass_admin:
+            st.sidebar.error("❌ Password Master Salah")
     
-    elif role_pilihan in ["Karu (Kepala Regu)", "Kabid", "Direktur", "SDM", "Admin"]:
-        # Filter role spesifik yang dipilih pada dropdown sidebar
+    elif role_pilihan in ["Karu (Kepala Regu)", "Kabid", "Direktur", "SDM"]:
         role_mapping = {
             "Karu (Kepala Regu)": "Karu",
             "Kabid": "Kabid",
             "Direktur": "Direktur",
-            "SDM": "SDM",
-            "Admin": "Admin"
+            "SDM": "SDM"
         }
         target_role = role_mapping[role_pilihan]
         
         user_list = [u["username"] for u in data_saat_ini["users"] if u["role"] == target_role]
         
         if not user_list:
-            st.sidebar.warning(f"Belum ada akun dengan role {target_role} terdaftar. Silakan buat via akun SDM terlebih dahulu.")
+            st.sidebar.warning(f"Belum ada akun dengan role {target_role} terdaftar. Silakan buat via akun Admin terlebih dahulu.")
         else:
             username_pilih = st.sidebar.selectbox("Pilih Username", user_list)
             password_input = st.sidebar.text_input("Password", type="password")
@@ -123,7 +131,7 @@ if menu_login == "Masuk Aplikasi":
                 for u in data_saat_ini["users"]:
                     if u["username"] == username_pilih:
                         if u["status_akun"] == "Menunggu Reset":
-                            st.sidebar.error("⚠️ Akun ini terkunci! Menunggu reset oleh SDM.")
+                            st.sidebar.error("⚠️ Akun ini terkunci! Menunggu reset oleh Admin.")
                             cocok = True
                             break
                         elif u["password"] == password_input:
@@ -134,7 +142,7 @@ if menu_login == "Masuk Aplikasi":
                 if not cocok and password_input:
                     st.sidebar.error("❌ Password salah.")
                     
-        if "user_login_aktif" in st.session_state:
+        if "user_login_aktif" in st.session_state and st.session_state.user_login_aktif.get("username") != "admin":
             user_login_aktif = st.session_state.user_login_aktif
             role_aktif = user_login_aktif["role"]
             st.sidebar.info(f"🔑 Role Aktif: **{role_aktif}** | User: **{user_login_aktif['username']}**")
@@ -142,9 +150,17 @@ if menu_login == "Masuk Aplikasi":
                 del st.session_state.user_login_aktif
                 st.rerun()
 
+    if "user_login_aktif" in st.session_state and st.session_state.user_login_aktif.get("username") == "admin":
+        role_aktif = "Admin"
+        user_login_aktif = st.session_state.user_login_aktif
+        st.sidebar.info("🔑 Status: **Super Admin**")
+        if st.sidebar.button("🚪 Keluar (Logout)"):
+            del st.session_state.user_login_aktif
+            st.rerun()
+
 elif menu_login == "Lupa / Reset Password":
     st.subheader("🔑 Formulir Pengajuan Reset Password")
-    st.write("Lupa password akses akun? Pilih username Anda dan buat password baru. Perubahan ini akan aktif setelah disetujui tim SDM.")
+    st.write("Lupa password akses akun? Pilih username Anda dan buat password baru. Perubahan ini akan aktif setelah disetujui tim Admin.")
     
     with st.form("form_reset_pass"):
         u_reset = st.selectbox("Pilih Username Anda", [u["username"] for u in data_saat_ini["users"]])
@@ -163,7 +179,7 @@ elif menu_login == "Lupa / Reset Password":
                         u["password_baru"] = p_baru1
                         break
                 if push_database_to_github(data_saat_ini, sha_saat_ini, f"Reset User: {u_reset}"):
-                    st.success("✅ Berhasil diajukan! Harap lapor ke tim SDM untuk membuka gembok akun.")
+                    st.success("✅ Berhasil diajukan! Harap lapor ke tim Admin untuk membuka gembok akun.")
 
 # =========================================================================
 # 🏛️ HALAMAN UTAMA CORE PORTAL KOPERASI
@@ -193,7 +209,7 @@ if role_aktif == "User Biasa":
         # Ambil daftar username yang ber-role 'Karu' saja untuk di-input pemohon
         karu_list = [u["username"] for u in data_saat_ini["users"] if u["role"] == "Karu"]
         if not karu_list:
-            st.error("❌ Belum ada akun Karu (Kepala Regu) yang terdaftar di sistem! Harap hubungi SDM.")
+            st.error("❌ Belum ada akun Karu (Kepala Regu) yang terdaftar di sistem! Harap hubungi Admin.")
             target_karu = ""
         else:
             target_karu = st.selectbox("Target Username Karu", karu_list)
@@ -229,7 +245,7 @@ if role_aktif == "User Biasa":
                 st.session_state.preview_data = {
                     "nama": nama.strip(), "no_anggota": no_anggota.strip(), 
                     "lantai_asal": lantai_asal, "unit": unit,
-                    "target_karu": target_karu, # Tersimpan spesifik username karu tujuan
+                    "target_karu": target_karu,
                     "nama_istri_saudara": nama_istri_saudara.strip(),
                     "nominal": nominal, "keperluan": keperluan.strip(),
                     "ttd_pengaju": ttd_user, "ttd_keluarga": ttd_keluarga,
@@ -256,13 +272,12 @@ if role_aktif == "User Biasa":
                     time.sleep(1.2); st.rerun()
 
 # ---------------------------------------------------------------------
-# ✅ KARU (KEPALA REGU) - HANYA MEMPROSES BERKAS YANG DITUJUKAN KE USERNAME-NYA
+# ✅ KARU (KEPALA REGU)
 # ---------------------------------------------------------------------
 elif role_aktif == "Karu":
     st.subheader(f"👋 Selamat Datang Kepala Regu (Karu): {user_login_aktif['username']}")
     st.info("Anda berwenang meng-ACC berkas pengajuan yang ditujukan langsung ke akun Anda.")
     
-    # Filter ketat: hanya munculkan data jika status Menunggu Karu DAN target_karu sama dengan username login
     items = [
         i for i in data_saat_ini["database"] 
         if i.get("status") == "Menunggu Verifikasi Karu" and i.get("target_karu") == user_login_aktif["username"]
@@ -298,7 +313,7 @@ elif role_aktif == "Karu":
                 for d in data_saat_ini["database"]:
                     if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Verifikasi Karu":
                         d["status"] = "Menunggu Bidang"
-                        d["ttd_kadiv"] = ttd_div  # Tetap memakai key ttd_kadiv untuk alur cetak PDF
+                        d["ttd_kadiv"] = ttd_div
                         break
                 if push_database_to_github(data_saat_ini, sha_saat_ini, f"Karu ACC: {item['nama']}"):
                     st.success("✅ Berhasil disetujui Karu! Berkas dilanjutkan ke Kepala Bidang (Kabid).")
@@ -368,18 +383,35 @@ elif role_aktif == "Direktur":
         st.write("---")
 
 # ---------------------------------------------------------------------
-# ✅ SDM & ADMIN (ADMIN PUSAT & MANAJEMEN AKUN LOGIN)
+# ✅ SDM
 # ---------------------------------------------------------------------
-elif role_aktif in ["SDM", "Admin"]:
-    tab1, tab2, tab3 = st.tabs(["📋 Semua Berkas", "🔐 Reset Password Akses", "👥 Manajemen Akun Login"])
+elif role_aktif == "SDM":
+    st.subheader("👋 Halaman SDM (Manajemen Data Portal)")
+    st.info("Anda dapat mengelola akun dan mengakses rekapitulasi data.")
     
-    # TAB 1: DAFTAR SELURUH BERKAS & CETAK PDF
+    tab_sdm1, tab_sdm2 = st.tabs(["📋 Rekap Berkas Selesai", "👥 Manajemen Akun Akses"])
+    
+    with tab_sdm1:
+        selesais_sdm = [i for i in data_saat_ini["database"] if i.get("status") == "SELESAI"]
+        if not selesais_sdm: st.info("Belum ada arsip data yang berstatus selesai.")
+        for s_item in selesais_sdm:
+            st.write(f"• **{s_item['nama']}** — Rp {s_item['nominal']:,} (Karu: {s_item.get('target_karu')})")
+            
+    with tab_sdm2:
+        st.warning("⚠️ *Manajemen akun login diarahkan melalui login Super Admin (Admin Portal).*")
+        for u_item in data_saat_ini["users"]:
+            st.write(f"• Username: **{u_item['username']}** | Role: *{u_item['role']}*")
+
+# ---------------------------------------------------------------------
+# ✅ SUPER ADMIN (ADMIN PORTAL: AKSES SEGALA MENU DAN PENGATURAN)
+# ---------------------------------------------------------------------
+elif role_aktif == "Admin":
+    st.success("👑 PANEL SUPER ADMIN: Anda memiliki akses tak terbatas ke seluruh sistem")
+    
+    tab1, tab2, tab3, tab4 = st.tabs(["📋 Semua Berkas / Bypass", "🖨️ Cetak PDF", "🔐 Reset Password", "👥 Manajemen Akun Lengkap"])
+    
     with tab1:
-        st.subheader("🖨️ Arsip Berkas & Cetak PDF Resmi")
-        
-        # Tombol bypass darurat jika admin pusat ingin memaksa SELESAI
-        st.write("---")
-        st.subheader("🔓 Berkas Dalam Antrean Berjenjang")
+        st.subheader("🔓 Berkas Dalam Antrean Berjenjang (Bypass)")
         items_all = [i for i in data_saat_ini["database"] if i.get("status") != "SELESAI"]
         if not items_all: st.info("Semua berkas pengajuan sudah berstatus SELESAI.")
         
@@ -390,12 +422,12 @@ elif role_aktif in ["SDM", "Admin"]:
                     if str(d["no_anggota"]).strip() == str(it["no_anggota"]).strip() and d.get("status") == it["status"]:
                         d["status"] = "SELESAI"
                         break
-                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Bypass SDM: {it['nama']}"):
+                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Bypass Admin: {it['nama']}"):
                     st.success("Berkas dipaksa SELESAI."); time.sleep(1.2); st.rerun()
             st.write("---")
 
-        st.write("---")
-        st.subheader("📜 Daftar Berkas Selesai (Siap Cetak)")
+    with tab2:
+        st.subheader("🖨️ Arsip Berkas Selesai (Cetak PDF Resmi)")
         selesais = [i for i in data_saat_ini["database"] if i.get("status") == "SELESAI"]
         if "print_id" not in st.session_state: st.session_state.print_id = None
         
@@ -457,8 +489,7 @@ elif role_aktif in ["SDM", "Admin"]:
                 """
                 st.components.v1.html(html_template, height=450, scrolling=True)
 
-    # TAB 2: RESET PASSWORD AKUN
-    with tab2:
+    with tab3:
         st.subheader("🔐 Permintaan Reset Password Akun")
         user_reset = [u for u in data_saat_ini["users"] if u.get("status_akun") == "Menunggu Reset"]
         if not user_reset: st.info("Aman! Tidak ada permintaan reset password.")
@@ -479,14 +510,11 @@ elif role_aktif in ["SDM", "Admin"]:
                     if push_database_to_github(data_saat_ini, sha_saat_ini, f"Rej Reset: {u_item['username']}"):
                         st.error("Reset dibatalkan."); time.sleep(1.2); st.rerun()
 
-    # TAB 3: MANAJEMEN AKUN LOGIN (TAMBAH/HAPUS USER, KARU, KABID, DIREKTUR, SDM)
-    with tab3:
+    with tab4:
         st.subheader("👥 Manajemen Akun Akses Sistem Berjenjang")
-        
-        # --- Form Tambah Akun Login ---
         with st.form("form_tambah_user"):
             st.write("<b>➕ Tambahkan Akun / Role Baru</b>", unsafe_allow_html=True)
-            new_username = st.text_input("Username Baru (Tanpa spasi, Contoh: karu_lt6 atau kabid_cabang)")
+            new_username = st.text_input("Username Baru (Tanpa spasi)")
             new_role = st.selectbox("Pilih Role / Hak Akses", ["Karu", "Kabid", "Direktur", "SDM", "Admin"])
             new_pass = st.text_input("Password Default", value="123")
             
@@ -514,8 +542,6 @@ elif role_aktif in ["SDM", "Admin"]:
                             st.success(f"Akun {new_username} dengan role {new_role} berhasil ditambahkan!"); time.sleep(1.2); st.rerun()
 
         st.write("---")
-        
-        # --- Daftar Hapus Akun Login ---
         st.write("<b>🗑️ Hapus / Kurangi Akun Akses</b>", unsafe_allow_html=True)
         for u_item in data_saat_ini["users"]:
             col_u1, col_u2 = st.columns([4, 1])

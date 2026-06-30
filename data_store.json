@@ -124,14 +124,6 @@
     ],
     "users": [
         {
-            "username": "rpu lt 2",
-            "nama": "fitri",
-            "role": "Kepala Divisi",
-            "password": "123",
-            "status_akun": "Aktif",
-            "password_baru": ""
-        },
-        {
             "username": "silki",
             "role": "SDM",
             "password": "123",

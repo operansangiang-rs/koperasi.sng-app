@@ -98,6 +98,22 @@
             "ttd_kadiv": "",
             "ttd_kabid": "",
             "ttd_direktur": ""
+        },
+        {
+            "nama": "adf",
+            "no_anggota": "4542",
+            "lantai_asal": "Lantai 1",
+            "unit": "Keuangan",
+            "nama_pejabat": "adfbsgb",
+            "nama_istri_saudara": "sdaas",
+            "nominal": 2456234543,
+            "keperluan": "gsgfv",
+            "ttd_pengaju": "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",
+            "ttd_keluarga": "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",
+            "status": "Menunggu Verifikasi Kepala Divisi",
+            "ttd_kadiv": "",
+            "ttd_kabid": "",
+            "ttd_direktur": ""
         }
     ],
     "categories": [
@@ -119,6 +135,38 @@
             "username": "rpu lt 2",
             "nama": "fitri",
             "role": "Kepala Divisi",
+            "password": "123",
+            "status_akun": "Aktif",
+            "password_baru": ""
+        }
+    ],
+    "daftar_lantai": [
+        {
+            "nama_lantai": "Lantai 1",
+            "password": "123",
+            "status_akun": "Aktif",
+            "password_baru": ""
+        },
+        {
+            "nama_lantai": "Lantai 2",
+            "password": "123",
+            "status_akun": "Aktif",
+            "password_baru": ""
+        },
+        {
+            "nama_lantai": "Lantai 3",
+            "password": "123",
+            "status_akun": "Aktif",
+            "password_baru": ""
+        },
+        {
+            "nama_lantai": "Lantai 4",
+            "password": "123",
+            "status_akun": "Aktif",
+            "password_baru": ""
+        },
+        {
+            "nama_lantai": "Lantai 5",
             "password": "123",
             "status_akun": "Aktif",
             "password_baru": ""

@@ -82,6 +82,57 @@ def push_database_to_github(updated_data, sha_lama, message):
 data_saat_ini, sha_saat_ini = load_data_from_github()
 
 # =========================================================================
+# 🔑 HTML RENDER TAMPILAN CETAK PDF FORMULIR
+# =========================================================================
+def render_cetak_pdf_html(s):
+    html_template = f"""
+    <div id="print-area" style="padding:20px; border:2px solid #333; font-family:Arial; background:white; color:black; max-width:650px; margin:auto;">
+        <div style="text-align:center; border-bottom:3px double #333; padding-bottom:5px; margin-bottom:15px;">
+            <h3 style="margin:0;">FORMULIR PINJAMAN KOPERASI BERJENJANG</h3>
+        </div>
+        <table style="width:100%; font-size:13px; margin-bottom:20px;">
+            <tr><td><b>Nama Pemohon (Pengaju)</b></td><td>: <b>{s['nama']}</b></td></tr>
+            <tr><td><b>No Anggota</b></td><td>: {s['no_anggota']}</td></tr>
+            <tr><td><b>Nominal Dana</b></td><td>: <b>Rp {s['nominal']:,}</b></td></tr>
+            <tr><td><b>Keperluan</b></td><td>: {s['keperluan']}</td></tr>
+            <tr><td><b>Karu Tujuan (ACC)</b></td><td>: {s.get('target_karu', '-')}</td></tr>
+            <tr><td><b>Penjamin (Istri/Saudara)</b></td><td>: {s.get('nama_istri_saudara', '-')}</td></tr>
+        </table>
+        <div style="display:table; width:100%; text-align:center; font-size:11px;">
+            <div style="display:table-row;">
+                <div style="display:table-cell; width:50%; padding-bottom:10px;">
+                    <p style="margin:0 0 5px 0; font-weight:bold;">1. Pemohon (Anggota)</p>
+                    <img src="data:image/png;base64,{s.get('ttd_pengaju','')}" style="height:50px; border:1px dashed #ccc;"/>
+                </div>
+                <div style="display:table-cell; width:50%; padding-bottom:10px;">
+                    <p style="margin:0 0 5px 0; font-weight:bold;">2. Penjamin: {s.get('nama_istri_saudara','')}</p>
+                    <img src="data:image/png;base64,{s.get('ttd_keluarga','')}" style="height:50px; border:1px dashed #ccc;"/>
+                </div>
+            </div>
+            <div style="display:table-row;">
+                <div style="display:table-cell; width:50%; padding-bottom:10px;">
+                    <p style="margin:0 0 5px 0; font-weight:bold;">3. Karu (Kepala Regu)</p>
+                    <img src="data:image/png;base64,{s.get('ttd_kadiv','')}" style="height:50px; border:1px dashed #ccc;"/>
+                </div>
+                <div style="display:table-cell; width:50%; padding-bottom:10px;">
+                    <p style="margin:0 0 5px 0; font-weight:bold;">4. Kepala Bidang (Kabid)</p>
+                    <img src="data:image/png;base64,{s.get('ttd_kabid','')}" style="height:50px; border:1px dashed #ccc;"/>
+                </div>
+            </div>
+            <div style="display:table-row;">
+                <div style="display:table-cell; width:50%;"></div>
+                <div style="display:table-cell; width:50%;">
+                    <p style="margin:0 0 5px 0; font-weight:bold;">5. Direktur Koperasi</p>
+                    <img src="data:image/png;base64,{s.get('ttd_direktur','')}" style="height:50px; border:1px dashed #ccc;"/>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>setTimeout(function(){{ window.print(); }}, 800);</script>
+    """
+    return html_template
+
+# =========================================================================
 # 🔑 LOGIN & RESET PASSWORD SYSTEM
 # =========================================================================
 st.sidebar.title("🏛️ Akses Sistem")
@@ -426,9 +477,34 @@ elif role_aktif == "SDM":
     with tab_sdm1:
         st.subheader("📑 Arsip Berkas Selesai (ACC Lengkap)")
         selesais_sdm = [i for i in data_saat_ini["database"] if i.get("status") == "SELESAI"]
-        if not selesais_sdm: st.info("Belum ada arsip data yang berstatus selesai.")
-        for s_item in selesais_sdm:
-            st.write(f"• Pengaju: **{s_item['nama']}** — Rp {s_item['nominal']:,} (Karu: {s_item.get('target_karu')}) — Keperluan: {s_item['keperluan']}")
+        
+        if not selesais_sdm: 
+            st.info("Belum ada arsip data yang berstatus selesai.")
+            
+        if "print_id_sdm" not in st.session_state: 
+            st.session_state.print_id_sdm = None
+            
+        for idx_s, s_item in enumerate(selesais_sdm):
+            col_s1, col_s2, col_s3 = st.columns([3, 1.5, 1.5])
+            with col_s1: 
+                st.write(f"✅ Pengaju: **{s_item['nama']}** — Rp {s_item['nominal']:,}")
+            with col_s2:
+                if st.button("🖨️ Buka Printer PDF", key=f"print_sdm_{idx_s}"): 
+                    st.session_state.print_id_sdm = s_item['no_anggota']
+            with col_s3:
+                if st.button("🗑️ Hapus Berkas", key=f"del_sdm_{idx_s}"):
+                    data_saat_ini["database"] = [d for d in data_saat_ini["database"] if d["no_anggota"] != s_item["no_anggota"]]
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"SDM Hapus Arsip: {s_item['nama']}"):
+                        st.toast(f"Arsip {s_item['nama']} berhasil dihapus permanen.")
+                        time.sleep(1.2); st.rerun()
+            
+            if st.session_state.print_id_sdm == s_item['no_anggota']:
+                if st.button("❌ Tutup Jendela Cetak", key=f"close_print_sdm_{idx_s}"):
+                    st.session_state.print_id_sdm = None
+                    st.rerun()
+                html_isi = render_cetak_pdf_html(s_item)
+                st.components.v1.html(html_isi, height=450, scrolling=True)
+            st.write("---")
             
     with tab_sdm2:
         st.subheader("👁️ Transparansi: Pemantauan Seluruh Pengajuan Berjalan")
@@ -487,51 +563,7 @@ elif role_aktif == "Admin":
                 if st.button("❌ Tutup Jendela Cetak", key=f"close_btn_{idx}"):
                     st.session_state.print_id = None
                     st.rerun()
-                html_template = f"""
-                <div id="print-area" style="padding:20px; border:2px solid #333; font-family:Arial; background:white; color:black; max-width:650px; margin:auto;">
-                    <div style="text-align:center; border-bottom:3px double #333; padding-bottom:5px; margin-bottom:15px;">
-                        <h3 style="margin:0;">FORMULIR PINJAMAN KOPERASI BERJENJANG</h3>
-                    </div>
-                    <table style="width:100%; font-size:13px; margin-bottom:20px;">
-                        <tr><td><b>Nama Pemohon (Pengaju)</b></td><td>: <b>{s['nama']}</b></td></tr>
-                        <tr><td><b>No Anggota</b></td><td>: {s['no_anggota']}</td></tr>
-                        <tr><td><b>Nominal Dana</b></td><td>: <b>Rp {s['nominal']:,}</b></td></tr>
-                        <tr><td><b>Keperluan</b></td><td>: {s['keperluan']}</td></tr>
-                        <tr><td><b>Karu Tujuan (ACC)</b></td><td>: {s.get('target_karu', '-')}</td></tr>
-                        <tr><td><b>Penjamin (Istri/Saudara)</b></td><td>: {s.get('nama_istri_saudara', '-')}</td></tr>
-                    </table>
-                    <div style="display:table; width:100%; text-align:center; font-size:11px;">
-                        <div style="display:table-row;">
-                            <div style="display:table-cell; width:50%; padding-bottom:10px;">
-                                <p style="margin:0 0 5px 0; font-weight:bold;">1. Pemohon (Anggota)</p>
-                                <img src="data:image/png;base64,{s.get('ttd_pengaju','')}" style="height:50px; border:1px dashed #ccc;"/>
-                            </div>
-                            <div style="display:table-cell; width:50%; padding-bottom:10px;">
-                                <p style="margin:0 0 5px 0; font-weight:bold;">2. Penjamin: {s.get('nama_istri_saudara','')}</p>
-                                <img src="data:image/png;base64,{s.get('ttd_keluarga','')}" style="height:50px; border:1px dashed #ccc;"/>
-                            </div>
-                        </div>
-                        <div style="display:table-row;">
-                            <div style="display:table-cell; width:50%; padding-bottom:10px;">
-                                <p style="margin:0 0 5px 0; font-weight:bold;">3. Karu (Kepala Regu)</p>
-                                <img src="data:image/png;base64,{s.get('ttd_kadiv','')}" style="height:50px; border:1px dashed #ccc;"/>
-                            </div>
-                            <div style="display:table-cell; width:50%; padding-bottom:10px;">
-                                <p style="margin:0 0 5px 0; font-weight:bold;">4. Kepala Bidang (Kabid)</p>
-                                <img src="data:image/png;base64,{s.get('ttd_kabid','')}" style="height:50px; border:1px dashed #ccc;"/>
-                            </div>
-                        </div>
-                        <div style="display:table-row;">
-                            <div style="display:table-cell; width:50%;"></div>
-                            <div style="display:table-cell; width:50%;">
-                                <p style="margin:0 0 5px 0; font-weight:bold;">5. Direktur Koperasi</p>
-                                <img src="data:image/png;base64,{s.get('ttd_direktur','')}" style="height:50px; border:1px dashed #ccc;"/>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <script>setTimeout(function(){{ window.print(); }}, 800);</script>
-                """
+                html_template = render_cetak_pdf_html(s)
                 st.components.v1.html(html_template, height=450, scrolling=True)
 
     with tab3:

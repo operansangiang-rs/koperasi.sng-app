@@ -32,8 +32,8 @@ def save_data(data_baru):
 st.title("🏛️ Pengajuan Pinjaman Koperasi")
 st.write("Isi formulir di bawah. Data otomatis tersimpan langsung ke dalam file **data_store.json**.")
 
-# 1. FORMULIR INPUT DATA ANGGOTA
-with st.form("form_pinjaman", clear_on_submit=True):
+# 1. FORMULIR INPUT DATA ANGGOTA - (clear_on_submit sudah dimatikan agar data terbaca sempurna)
+with st.form("form_pinjaman"):
     nama = st.text_input("Nama Lengkap Anggota")
     no_anggota = st.text_input("Nomor Anggota Koperasi")
     nominal = st.number_input("Nominal Pinjaman (Rp)", min_value=100000, step=50000)
@@ -58,7 +58,7 @@ with st.form("form_pinjaman", clear_on_submit=True):
 
 # 2. PROSES SIMPAN KE FILE data_store.json
 if submit_button:
-    if not nama or not no_anggota:
+    if not nama.strip() or not no_anggota.strip():
         st.error("❌ Mohon isi Nama dan Nomor Anggota terlebih dahulu!")
     elif canvas_result.image_data is None:
         st.error("❌ Tanda tangan wajib diisi!")
@@ -70,13 +70,13 @@ if submit_button:
             img.save(buffered, format="PNG")
             img_str = base64.b64encode(buffered.getvalue()).decode()
             
-            # Buat paket data
+            # Buat paket data (Memastikan teks nama & nomor terambil utuh)
             entri_baru = {
-                "nama": nama,
-                "no_anggota": no_anggota,
+                "nama": str(nama),
+                "no_anggota": str(no_anggota),
                 "nominal": int(nominal),
-                "keperluan": keperluan,
-                "tanda_tangan_base64": img_str  # TTD tetap disimpan aman di dalam file JSON
+                "keperluan": str(keperluan),
+                "tanda_tangan_base64": img_str
             }
             
             # Eksekusi simpan
@@ -86,28 +86,25 @@ if submit_button:
         except Exception as e:
             st.error(f"Terjadi kesalahan sistem: {e}")
 
-# 3. MONITOR DATA (YANG DITAMPILKAN DI WEB HANYA YANG RAPI SAJA)
+# 3. MONITOR DATA
 st.write("---")
 st.subheader("📊 Daftar Riwayat Pengajuan Koperasi")
 
 data_tercatat = load_data()
 
 if data_tercatat:
-    # Buat salinan data untuk tampilan layar saja
     data_tampilan_layar = []
     for item in data_tercatat:
         data_tampilan_layar.append({
-            "Nama": item["nama"],
-            "No Anggota": item["no_anggota"],
-            "Nominal (Rp)": item["nominal"],
-            "Keperluan": item["keperluan"]
+            "Nama": item.get("nama", "-"),
+            "No Anggota": item.get("no_anggota", "-"),
+            "Nominal (Rp)": item.get("nominal", 0),
+            "Keperluan": item.get("keperluan", "-")
         })
     
-    # Tampilkan dalam bentuk tabel rapi (Tanpa kode teks tulisan aneh tadi)
     df_tampil = pd.DataFrame(data_tampilan_layar)
     st.dataframe(df_tampil, use_container_width=True)
     
-    # BONUS: Tampilkan Gambar Tanda Tangan Terakhir yang baru saja diinput
     st.write("**Pratinjau Tanda Tangan Terakhir:**")
     try:
         last_ttd_base64 = data_tercatat[-1]["tanda_tangan_base64"]
@@ -118,7 +115,6 @@ if data_tercatat:
     except Exception:
         pass
 
-    # Tombol download file aslinya tetap ada jika Mas Lian butuh untuk dipindahkan
     json_string = json.dumps(data_tercatat, indent=4, ensure_ascii=False)
     st.download_button(
         label="📥 Download Database data_store.json",

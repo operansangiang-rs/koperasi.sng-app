@@ -7,7 +7,7 @@ import io
 import requests
 import time
 
-st.set_page_config(page_title="Sistem Approval Berjenjang Koperasi", layout="centered")
+st.set_page_config(page_title="Sistem Koperasi Berjenjang", layout="centered")
 
 # =========================================================================
 # 🔐 GITHUB SECRETS
@@ -20,9 +20,17 @@ except Exception:
     REPO_NAME = ""
 
 DB_FILE = "data_store.json"
-TEMPLATE_AWAL = {"database": [], "categories": ["Pinjaman Rutin", "Pinjaman Darurat", "Pinjaman Modal Usaha"]}
 
-# --- Fungsi Helper: Konversi Canvas ke Base64 ---
+# Template awal database jika file JSON di GitHub masih kosong atau baru dibuat
+TEMPLATE_AWAL = {
+    "database": [],
+    "users": [
+        # Akun bawaan (Default) untuk simulasi awal, bisa ditambah lewat aplikasi nanti
+        {"username": "kadiv_it", "nama": "Ahmad S.Kom", "role": "Kepala Divisi", "unit": "IT", "lantai": "Lantai 3", "password": "123", "status_akun": "Aktif", "password_baru": ""},
+        {"username": "kadiv_bo1", "nama": "Siti Aminah", "role": "Kepala Divisi", "unit": "Back Office", "lantai": "Lantai 1", "password": "123", "status_akun": "Aktif", "password_baru": ""}
+    ]
+}
+
 def canvas_to_base64(canvas_data):
     if canvas_data is not None:
         try:
@@ -35,7 +43,6 @@ def canvas_to_base64(canvas_data):
             pass
     return None
 
-# --- Fungsi API GitHub ---
 def load_data_from_github():
     if GITHUB_TOKEN.startswith("ghp_") and "/" in REPO_NAME:
         url = f"https://api.github.com/repos/{REPO_NAME}/contents/{DB_FILE}"
@@ -49,7 +56,7 @@ def load_data_from_github():
             try:
                 data = json.loads(content_decoded)
                 if "database" not in data: data["database"] = []
-                if "categories" not in data: data["categories"] = []
+                if "users" not in data: data["users"] = TEMPLATE_AWAL["users"]
                 return data, file_content["sha"]
             except Exception:
                 return TEMPLATE_AWAL, file_content.get("sha", None)
@@ -73,316 +80,352 @@ def push_database_to_github(updated_data, sha_lama, message):
 data_saat_ini, sha_saat_ini = load_data_from_github()
 
 # =========================================================================
-# 🔑 LOGIN SYSTEM & SESSION STATE
+# 🔑 LOGIN & RESET PASSWORD SYSTEM
 # =========================================================================
-st.sidebar.title("🔐 Login Pejabat")
-role = st.sidebar.selectbox("Pilih Role", ["User Biasa", "Kepala Divisi", "Kepala Bidang", "Direktur", "SDM"])
+st.sidebar.title("🏛️ Akses Sistem")
+menu_login = st.sidebar.radio("Menu", ["Masuk Aplikasi", "Lupa / Reset Password"])
+
+user_aktif = None
+role_aktif = "User Biasa"
+unit_aktif = None
+lantai_aktif = None
 
 if "preview_data" not in st.session_state:
     st.session_state.preview_data = None
 
-login_sukses = False
-if role == "User Biasa": login_sukses = True
-elif role == "Kepala Divisi" and st.sidebar.text_input("Pass", type="password") == "123": login_sukses = True
-elif role == "Kepala Bidang" and st.sidebar.text_input("Pass", type="password") == "1234": login_sukses = True
-elif role == "Direktur" and st.sidebar.text_input("Pass", type="password") == "12345": login_sukses = True
-elif role == "SDM" and st.sidebar.text_input("Pass", type="password") == "123456": login_sukses = True
-
-if not login_sukses:
-    st.info("👋 Silakan masukkan password valid di sidebar kiri.")
-else:
-    st.title(f"🏛️ Portal Koperasi - Akses: {role}")
-    st.write("---")
-
-    # ---------------------------------------------------------------------
-    # 📝 USER BIASA (PENGAJUAN) DENGAN TTD ISTRI / KELUARGA
-    # ---------------------------------------------------------------------
-    if role == "User Biasa":
-        st.subheader("📝 Formulir Pengajuan Pinjaman")
+if menu_login == "Masuk Aplikasi":
+    role_pilihan = st.sidebar.selectbox("Pilih Role Login", ["User Biasa", "Pejabat Divisi / Direktur", "SDM (Admin Pusat)"])
+    
+    if role_pilihan == "User Biasa":
+        role_aktif = "User Biasa"
+    
+    elif role_pilihan == "Pejabat Divisi / Direktur":
+        username_input = st.sidebar.text_input("Username Pejabat")
+        password_input = st.sidebar.text_input("Password", type="password")
         
-        with st.form("form_pengajuan"):
-            nama = st.text_input("Nama Lengkap")
-            no_anggota = st.text_input("No Anggota")
-            nominal = st.number_input("Nominal Pinjaman", min_value=0, step=50000)
-            keperluan = st.text_area("Keperluan")
-            
-            # Pembagian Kolom Tanda Tangan biar rapi berdampingan
-            col_ttd1, col_ttd2 = st.columns(2)
-            with col_ttd1:
-                st.write("✒️ **Tanda Tangan Pemohon:**")
-                cv_user = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=130, width=260, key="cv_user")
-            with col_ttd2:
-                st.write("✒️ **Tanda Tangan Istri / Keluarga:**")
-                cv_keluarga = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=130, width=260, key="cv_keluarga")
-            
-            cek_review = st.form_submit_button("🔍 Tinjau & Cek Data")
-            if cek_review:
-                ttd_user = canvas_to_base64(cv_user.image_data)
-                ttd_keluarga = canvas_to_base64(cv_keluarga.image_data)
+        if st.sidebar.button("Log In Pejabat"):
+            cocok = False
+            for u in data_saat_ini["users"]:
+                if u["username"] == username_input.strip():
+                    if u["status_akun"] == "Menunggu Reset":
+                        st.sidebar.error("⚠️ Akun Anda sedang dikunci! Menunggu persetujuan reset oleh SDM.")
+                        cocok = True
+                        break
+                    elif u["password"] == password_input:
+                        st.session_state.user_aktif = u
+                        st.sidebar.success(f"Selamat Datang, {u['nama']}")
+                        cocok = True
+                        st.rerun()
+            if not cocok and username_input:
+                st.sidebar.error("❌ Username atau Password salah / Akun belum terdaftar.")
                 
-                if not nama.strip() or not no_anggota.strip():
-                    st.error("❌ Nama dan Nomor Anggota wajib diisi!")
-                elif not ttd_user:
-                    st.error("❌ Tanda tangan Pemohon wajib diisi!")
-                elif not ttd_keluarga:
-                    st.error("❌ Tanda tangan Istri / Keluarga wajib diisi!")
-                else:
-                    st.session_state.preview_data = {
-                        "nama": nama.strip(), 
-                        "no_anggota": no_anggota.strip(), 
-                        "nominal": nominal, 
-                        "keperluan": keperluan.strip(),
-                        "ttd_pengaju": ttd_user, 
-                        "ttd_keluarga": ttd_keluarga, # Menyimpan ttd keluarga
-                        "status": "Menunggu Divisi",
-                        "ttd_kadiv": "", "ttd_kabid": "", "ttd_direktur": ""
-                    }
+        if "user_aktif" in st.session_state:
+            user_aktif = st.session_state.user_aktif
+            role_aktif = user_aktif["role"]
+            unit_aktif = user_aktif["unit"]
+            lantai_aktif = user_aktif["lantai"]
+            st.sidebar.info(f"🔑 Logged in: {user_aktif['nama']} ({unit_aktif} - {lantai_aktif})")
+            if st.sidebar.button("🚪 Keluar (Logout)"):
+                del st.session_state.user_aktif
+                st.rerun()
+                
+    elif role_pilihan == "SDM (Admin Pusat)":
+        pass_sdm = st.sidebar.text_input("Password Akun SDM", type="password")
+        if pass_sdm == "123456":
+            role_aktif = "SDM"
+            st.sidebar.success("Akses SDM Terbuka")
+        elif pass_sdm:
+            st.sidebar.error("Password Master SDM Salah")
 
-        if st.session_state.preview_data is not None:
-            p = st.session_state.preview_data
-            st.warning("⚠️ **Konfirmasi Pratinjau Berkas Sebelum Dikirim**")
-            st.info(f"**Nama:** {p['nama']} | **No Anggota:** {p['no_anggota']} | **Nominal:** Rp {p['nominal']:,}\n\n**Keperluan:** {p['keperluan']}")
+# --- FITUR AJUKAN RESET PASSWORD (MANUSIAWI & AMAN) ---
+elif menu_login == "Lupa / Reset Password":
+    st.subheader("🔑 Formulir Pengajuan Reset Password Pejabat")
+    st.write("Jika Anda lupa password, silakan masukkan username Anda dan buat password baru di bawah. Perubahan ini akan aktif setelah **disetujui oleh tim SDM**.")
+    
+    with st.form("form_reset_pass"):
+        u_reset = st.text_input("Masukkan Username Anda yang Terdaftar")
+        p_baru1 = st.text_input("Masukkan Password Baru", type="password")
+        p_baru2 = st.text_input("Ulangi Password Baru", type="password")
+        
+        if st.form_submit_button("Ajukan Reset Password ke SDM"):
+            if not u_reset.strip() or not p_baru1 or not p_baru2:
+                st.error("❌ Semua kolom wajib diisi!")
+            elif p_baru1 != p_baru2:
+                st.error("❌ Konfirmasi password baru tidak cocok!")
+            else:
+                user_ditemukan = False
+                for u in data_saat_ini["users"]:
+                    if u["username"] == u_reset.strip():
+                        u["status_akun"] = "Menunggu Reset"
+                        u["password_baru"] = p_baru1  # Ditampung sementara
+                        user_ditemukan = True
+                        break
+                
+                if user_ditemukan:
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Minta Reset: {u_reset}"):
+                        st.success("✅ Permintaan berhasil dikirim! Akun dikunci sementara. Silakan hubungi Tim SDM di Lantai Pusat untuk menyetujui password baru Anda.")
+                else:
+                    st.error("❌ Username tidak ditemukan di sistem!")
+
+# =========================================================================
+# 🏛️ HALAMAN UTAMA CORE PORTAL KOPERASI
+# =========================================================================
+st.title("🏛️ Portal Otomasi Koperasi Berjenjang")
+st.write(f"**Akses Aktif Anda:** {role_aktif if role_aktif != 'User Biasa' else 'Formulir Pengaju (Anggota)'}")
+st.write("---")
+
+# ---------------------------------------------------------------------
+# 📝 USER BIASA (FORMULIR DENGAN UNIT DAN LANTAI)
+# ---------------------------------------------------------------------
+if role_aktif == "User Biasa":
+    st.subheader("📝 Pengajuan Berkas Pinjaman")
+    with st.form("form_pengajuan"):
+        nama = st.text_input("Nama Lengkap")
+        no_anggota = st.text_input("No Anggota")
+        
+        # Penambahan Struktur Lokasi Kerja Penjaminan
+        c_lok1, c_lok2 = st.columns(2)
+        with c_lok1:
+            unit = st.selectbox("Asal Unit / Bagian Kerja", ["IT", "Back Office", "HRD", "Keuangan", "Produksi", "Logistik", "Umum"])
+        with c_lok2:
+            lantai = st.selectbox("Lokasi Lantai Kerja", ["Lantai 1", "Lantai 2", "Lantai 3", "Lantai 4", "Lantai 5"])
             
-            c1, c2 = st.columns(2)
-            with c1:
-                if st.button("✏️ Edit Kembali Data"):
+        nominal = st.number_input("Nominal Pinjaman (Rp)", min_value=0, step=50000)
+        keperluan = st.text_area("Keperluan / Alasan")
+        
+        col_ttd1, col_ttd2 = st.columns(2)
+        with col_ttd1:
+            st.write("✒️ **Tanda Tangan Pemohon:**")
+            cv_user = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=130, width=260, key="cv_user")
+        with col_ttd2:
+            st.write("✒️ **Tanda Tangan Istri / Keluarga:**")
+            cv_keluarga = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=130, width=260, key="cv_keluarga")
+        
+        cek_review = st.form_submit_button("🔍 Tinjau & Cek Data")
+        if cek_review:
+            ttd_user = canvas_to_base64(cv_user.image_data)
+            ttd_keluarga = canvas_to_base64(cv_keluarga.image_data)
+            
+            if not nama.strip() or not no_anggota.strip():
+                st.error("❌ Nama dan Nomor Anggota wajib diisi!")
+            elif not ttd_user or not ttd_keluarga:
+                st.error("❌ Kedua tanda tangan wajib diisi lengkap!")
+            else:
+                st.session_state.preview_data = {
+                    "nama": nama.strip(), "no_anggota": no_anggota.strip(), 
+                    "unit": unit, "lantai": lantai,
+                    "nominal": nominal, "keperluan": keperluan.strip(),
+                    "ttd_pengaju": ttd_user, "ttd_keluarga": ttd_keluarga,
+                    "status": "Menunggu Divisi", "ttd_kadiv": "", "ttd_kabid": "", "ttd_direktur": ""
+                }
+
+    if st.session_state.preview_data is not None:
+        p = st.session_state.preview_data
+        st.warning("⚠️ **Konfirmasi Pratinjau Berkas Sebelum Dikirim**")
+        st.info(f"**Nama:** {p['nama']} ({p['unit']} - {p['lantai']}) | **Nominal:** Rp {p['nominal']:,}")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("✏️ Edit Kembali Data"):
+                st.session_state.preview_data = None
+                st.rerun()
+        with c2:
+            if st.button("🚀 Data Sudah Yakin, Kirim Berkas!"):
+                data_saat_ini["database"].append(p)
+                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Baru: {p['nama']}"):
+                    st.success(f"✅ Sukses! Pengajuan terkirim otomatis ke Kepala Divisi {p['unit']} ({p['lantai']}).")
                     st.session_state.preview_data = None
-                    st.rerun()
-            with c2:
-                if st.button("🚀 Data Sudah Yakin, Kirim Berkas!"):
-                    data_saat_ini["database"].append(p)
-                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Baru: {p['nama']}"):
-                        st.success(f"✅ Sukses! Pengajuan {p['nama']} terkirim ke Kepala Divisi.")
-                        st.toast("Data Berhasil Disimpan!", icon="💾")
-                        st.session_state.preview_data = None
-                        time.sleep(1.5)
-                        st.rerun()
+                    time.sleep(1.5); st.rerun()
 
-    # ---------------------------------------------------------------------
-    # ✅ KEPALA DIVISI
-    # ---------------------------------------------------------------------
-    elif role == "Kepala Divisi":
-        items = [i for i in data_saat_ini["database"] if i.get("status", "Menunggu Divisi") == "Menunggu Divisi"]
-        if not items: 
-            st.info("Belum ada pengajuan baru yang memerlukan verifikasi Kepala Divisi.")
-        for idx, item in enumerate(items):
-            st.markdown(f"### 📋 Pengajuan: {item['nama']} — Rp {item['nominal']:,}")
-            st.write(f"**No Anggota:** {item['no_anggota']} | **Keperluan:** {item['keperluan']}")
+# ---------------------------------------------------------------------
+# ✅ KEPALA DIVISI (ROLE ACCESS CONTROL BERDASARKAN UNIT & LANTAI)
+# ---------------------------------------------------------------------
+elif role_aktif == "Kepala Divisi":
+    st.subheader(f"👋 Selamat Datang Kadiv: {user_aktif['nama']}")
+    st.info(f"Otoritas Monitor Anda: **Unit {unit_aktif} — {lantai_aktif}**")
+    
+    # FILTER KETAT: Hanya menampilkan berkas yang sesuai Unit dan Lantai dari Kadiv yang sedang login
+    items = [
+        i for i in data_saat_ini["database"] 
+        if i.get("status") == "Menunggu Divisi" and i.get("unit") == unit_aktif and i.get("lantai") == lantai_aktif
+    ]
+    
+    if not items: 
+        st.info(f"Bersih! Belum ada pengajuan baru dari anggota Unit {unit_aktif} {lantai_aktif}.")
+        
+    for idx, item in enumerate(items):
+        st.markdown(f"### 📋 Berkas Pengajuan: {item['nama']}")
+        st.write(f"**No Anggota:** {item['no_anggota']} | **Nominal Pinjaman:** Rp {item['nominal']:,}")
+        st.write(f"**Keperluan:** {item['keperluan']}")
+        
+        c_img1, c_img2 = st.columns(2)
+        with c_img1:
+            st.caption("Tanda Tangan Pemohon:")
+            st.image(base64.b64decode(item["ttd_pengaju"]), width=140)
+        with c_img2:
+            st.caption("Tanda Tangan Istri / Keluarga:")
+            st.image(base64.b64decode(item["ttd_keluarga"]), width=140)
             
-            # Menampilkan TTD Pengaju dan Keluarga sebagai bahan pertimbangan Kadiv
-            c_img1, c_img2 = st.columns(2)
-            with c_img1:
-                st.caption("Tanda Tangan Pemohon:")
-                if item.get("ttd_pengaju"): st.image(base64.b64decode(item["ttd_pengaju"]), width=150)
-            with c_img2:
-                st.caption("Tanda Tangan Istri / Keluarga:")
-                if item.get("ttd_keluarga"): st.image(base64.b64decode(item["ttd_keluarga"]), width=150)
-                
-            st.write("**Silakan Tanda Tangan Kepala Divisi untuk Menyetujui:**")
-            cv_div = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=150, width=300, key=f"cv_div_{idx}")
-            
-            if st.button("✍️ Setujui & Kirim Tanda Tangan", key=f"btn_div_{idx}"):
-                ttd_div = canvas_to_base64(cv_div.image_data)
-                if not ttd_div:
-                    st.error("❌ Anda wajib tanda tangan sebelum menyetujui!")
-                else:
-                    berhasil_update = False
-                    for d in data_saat_ini["database"]:
-                        if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Divisi":
-                            d["status"] = "Menunggu Bidang"
-                            d["ttd_kadiv"] = ttd_div
-                            berhasil_update = True
-                            break
-                    
-                    if berhasil_update and push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Kadiv: {item['nama']}"):
-                        st.success("✅ Berhasil disetujui! Berkas digeser ke Kepala Bidang.")
-                        st.toast("Persetujuan Berhasil Disimpan!", icon="📝")
-                        time.sleep(1.5)
-                        st.rerun()
-            st.write("---")
+        st.write(f"**Silakan Berikan Tanda Tangan Persetujuan Kepala Divisi {unit_aktif}:**")
+        cv_div = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=130, width=260, key=f"cv_div_{idx}")
+        
+        if st.button("✍️ Setujui & Teruskan Berkas", key=f"btn_div_{idx}"):
+            ttd_div = canvas_to_base64(cv_div.image_data)
+            if not ttd_div:
+                st.error("❌ Anda wajib menandandatangani kanvas digital terlebih dahulu!")
+            else:
+                for d in data_saat_ini["database"]:
+                    if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Divisi":
+                        d["status"] = "Menunggu Bidang"
+                        d["ttd_kadiv"] = ttd_div
+                        break
+                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Kadiv ACC: {item['nama']}"):
+                    st.success("✅ Berhasil disetujui! Berkas dinaikkan ke level Kepala Bidang.")
+                    time.sleep(1.2); st.rerun()
+        st.write("---")
 
-    # ---------------------------------------------------------------------
-    # ✅ KEPALA BIDANG
-    # ---------------------------------------------------------------------
-    elif role == "Kepala Bidang":
-        items = [i for i in data_saat_ini["database"] if i.get("status") == "Menunggu Bidang"]
-        if not items: st.info("Tidak ada data yang menunggu verifikasi Kepala Bidang.")
-        for idx, item in enumerate(items):
-            st.markdown(f"### 📋 Dari: {item['nama']} — Rp {item['nominal']:,}")
-            st.write(f"**No Anggota:** {item['no_anggota']} | **Keperluan:** {item['keperluan']}")
-            st.write("**Silakan Tanda Tangan Kepala Bidang:**")
-            
-            cv_bid = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=150, width=300, key=f"cv_bid_{idx}")
-            
-            if st.button("✍️ Verifikasi & Tanda Tangan Kabid", key=f"btn_bid_{idx}"):
-                ttd_bid = canvas_to_base64(cv_bid.image_data)
-                if not ttd_bid:
-                    st.error("❌ Anda wajib tanda tangan!")
-                else:
-                    berhasil_update = False
-                    for d in data_saat_ini["database"]:
-                        if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Bidang":
-                            d["status"] = "Menunggu Direktur"
-                            d["ttd_kabid"] = ttd_bid
-                            berhasil_update = True
-                            break
-                    if berhasil_update and push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Kabid: {item['nama']}"):
-                        st.success("✅ Berhasil disetujui Kabid! Dialihkan ke Direktur.")
-                        st.toast("Verifikasi Kabid Disimpan!", icon="💼")
-                        time.sleep(1.5)
-                        st.rerun()
-            st.write("---")
+# ---------------------------------------------------------------------
+# ✅ KEPALA BIDANG / DIREKTUR (LOGIKA AKSES SEPERTI SEBELUMNYA)
+# ---------------------------------------------------------------------
+elif role_aktif in ["Kepala Bidang", "Direktur"]:
+    target_status = "Menunggu Bidang" if role_aktif == "Kepala Bidang" else "Menunggu Direktur"
+    next_status = "Menunggu Direktur" if role_aktif == "Kepala Bidang" else "Menunggu SDM"
+    ttd_key = "ttd_kabid" if role_aktif == "Kepala Bidang" else "ttd_direktur"
+    
+    items = [i for i in data_saat_ini["database"] if i.get("status") == target_status]
+    if not items: 
+        st.info(f"Tidak ada berkas yang menunggu verifikasi {role_aktif}.")
+        
+    for idx, item in enumerate(items):
+        st.markdown(f"### 📋 Berkas: {item['nama']} (Unit: {item.get('unit')} - {item.get('lantai')})")
+        st.write(f"**Nominal:** Rp {item['nominal']:,} | **Alasan:** {item['keperluan']}")
+        
+        st.write(f"**Tanda Tangan {role_aktif}:**")
+        cv_pej = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=130, width=260, key=f"cv_pej_{idx}")
+        
+        if st.button(f"✍️ Setujui Sebagai {role_aktif}", key=f"btn_pej_{idx}"):
+            ttd_pej = canvas_to_base64(cv_pej.image_data)
+            if not ttd_pej:
+                st.error("Tanda tangan wajib diisi!")
+            else:
+                for d in data_saat_ini["database"]:
+                    if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == target_status:
+                        d["status"] = next_status
+                        d[ttd_key] = ttd_pej
+                        break
+                if push_database_to_github(data_saat_ini, sha_saat_ini, f"{role_aktif} ACC: {item['nama']}"):
+                    st.success(f"✅ Disetujui oleh {role_aktif}!")
+                    time.sleep(1.2); st.rerun()
 
-    # ---------------------------------------------------------------------
-    # ✅ DIREKTUR
-    # ---------------------------------------------------------------------
-    elif role == "Direktur":
-        items = [i for i in data_saat_ini["database"] if i.get("status") == "Menunggu Direktur"]
-        if not items: st.info("Tidak ada data yang menunggu verifikasi Direktur.")
-        for idx, item in enumerate(items):
-            st.markdown(f"### 📋 Persetujuan Direktur: {item['nama']} — Rp {item['nominal']:,}")
-            st.write(f"**Keperluan:** {item['keperluan']}")
-            st.write("**Tanda Tangan Direktur:**")
-            
-            cv_dir = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=150, width=300, key=f"cv_dir_{idx}")
-            
-            if st.button("✍️ Setujui (Direktur)", key=f"btn_dir_{idx}"):
-                ttd_dir = canvas_to_base64(cv_dir.image_data)
-                if not ttd_dir:
-                    st.error("❌ Anda wajib tanda tangan!")
-                else:
-                    berhasil_update = False
-                    for d in data_saat_ini["database"]:
-                        if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Direktur":
-                            d["status"] = "Menunggu SDM"
-                            d["ttd_direktur"] = ttd_dir
-                            berhasil_update = True
-                            break
-                    if berhasil_update and push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Direktur: {item['nama']}"):
-                        st.success("✅ Berhasil disetujui Direktur! Dialihkan ke SDM.")
-                        st.toast("Persetujuan Direktur Disimpan!", icon="🏛️")
-                        time.sleep(1.5)
-                        st.rerun()
-            st.write("---")
-
-    # ---------------------------------------------------------------------
-    # ✅ SDM (FINAL ACC & PRINT PDF LENGKAP)
-    # ---------------------------------------------------------------------
-    elif role == "SDM":
-        if "print_id" not in st.session_state:
-            st.session_state.print_id = None
-
+# ---------------------------------------------------------------------
+# ✅ SDM (ADMIN PUSAT: ACC FINAL & VERIFIKASI RESET PASSWORD)
+# ---------------------------------------------------------------------
+elif role_aktif == "SDM":
+    tab1, tab2 = st.tabs(["📋 Antrean Kelayakan Pinjaman", "🔐 Persetujuan Reset Password Pejabat"])
+    
+    # TAB 1: FINAlISASI BERKAS PINJAMAN KOPERASI
+    with tab1:
+        if "print_id" not in st.session_state: st.session_state.print_id = None
         items = [i for i in data_saat_ini["database"] if i.get("status") == "Menunggu SDM"]
-        if not items: st.info("Tidak ada pengajuan yang siap di-ACC.")
+        if not items: st.info("Tidak ada berkas pinjaman masuk.")
         for idx, item in enumerate(items):
-            st.markdown(f"### 📋 Final ACC SDM: {item['nama']} — Rp {item['nominal']:,}")
-            st.write(f"**No Anggota:** {item['no_anggota']} | **Keperluan:** {item['keperluan']}")
-            
-            c_sdm_img1, c_sdm_img2 = st.columns(2)
-            with c_sdm_img1:
-                st.write("**Tanda Tangan Pengaju:**")
-                if item.get("ttd_pengaju"): st.image(base64.b64decode(item["ttd_pengaju"]), width=180)
-            with c_sdm_img2:
-                st.write("**Tanda Tangan Istri/Keluarga:**")
-                if item.get("ttd_keluarga"): st.image(base64.b64decode(item["ttd_keluarga"]), width=180)
-
-            if st.button("🔒 ACC FINAL & NYATAKAN SELESAI", key=f"btn_sdm_{idx}"):
+            st.markdown(f"### Final ACC: {item['nama']} — Unit {item.get('unit')} ({item.get('lantai')})")
+            if st.button("🔒 NYATAKAN VALID & SELESAI", key=f"btn_sdm_{idx}"):
                 for d in data_saat_ini["database"]:
                     if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu SDM":
                         d["status"] = "SELESAI"
                         break
-                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Final ACC SDM: {item['nama']}"):
-                    st.success("Proses Selesai dan disimpan secara permanen!"); 
-                    st.toast("Status Berkas: SELESAI!", icon="🎉")
-                    time.sleep(1.5)
-                    st.rerun()
-            st.write("---")
-
+                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Final SDM: {item['nama']}"):
+                    st.success("Berkas ditutup dengan status SELESAI!"); time.sleep(1.2); st.rerun()
+                    
+        # Bagian Cetak PDF Tetap Aman di Bawah
         st.write("---")
-        st.subheader("🖨️ Riwayat Selesai (Siap Cetak PDF Resmi)")
+        st.subheader("🖨️ Arsip Berkas Cetak PDF Resmi")
         selesais = [i for i in data_saat_ini["database"] if i.get("status") == "SELESAI"]
-        
-        if not selesais:
-            st.text("Belum ada berkas formulir berstatus SELESAI.")
-        
         for idx, s in enumerate(selesais):
             col1, col2 = st.columns([4, 2])
-            with col1:
-                st.write(f"✅ **{s['nama']}** — Rp {s['nominal']:,}")
+            with col1: st.write(f"✅ **{s['nama']}** — Unit {s.get('unit')} — Rp {s['nominal']:,}")
             with col2:
-                if st.button("🖨️ Cetak Berkas PDF", key=f"print_btn_{idx}"):
-                    st.session_state.print_id = s['no_anggota']
-
+                if st.button("🖨️ Buka Printer PDF", key=f"print_btn_{idx}"): st.session_state.print_id = s['no_anggota']
+            
             if st.session_state.print_id == s['no_anggota']:
-                st.write("---")
-                if st.button("❌ Tutup / Batal Cetak", key=f"close_btn_{idx}"):
+                if st.button("❌ Tutup Jendela Cetak", key=f"close_btn_{idx}"):
                     st.session_state.print_id = None
                     st.rerun()
-                
-                st.info(f"Tekan tombol printer bawaan laptop/HP Anda untuk menyimpannya sebagai **Save as PDF**.")
-                
-                # Desain PDF Output (Menampilkan Lembar TTD Pemohon + Istri/Keluarga secara Berdampingan)
+                # Kode HTML Template Cetak multi ttd (Pemohon, Istri, Kadiv, Kabid, Direktur)
                 html_template = f"""
-                <div id="print-area" style="padding: 25px; border: 2px solid #333; font-family: Arial, sans-serif; background-color: white; color: black; max-width: 700px; margin: auto;">
-                    <div style="text-align: center; border-bottom: 3px double #333; padding-bottom: 10px; margin-bottom: 20px;">
-                        <h2 style="margin: 0; text-transform: uppercase;">FORMULIR RESMI PINJAMAN KOPERASI</h2>
-                        <p style="margin: 5px 0 0 0; font-size: 13px;">Sistem Otomasi Verifikasi Berjenjang Elektronik</p>
+                <div id="print-area" style="padding:20px; border:2px solid #333; font-family:Arial; background:white; color:black; max-width:650px; margin:auto;">
+                    <div style="text-align:center; border-bottom:3px double #333; padding-bottom:5px; margin-bottom:15px;">
+                        <h3 style="margin:0;">FORMULIR PINJAMAN KOPERASI MULTI-UNIT BERJENJANG</h3>
                     </div>
-                    
-                    <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 25px;">
-                        <tr><td style="width: 30%; padding: 6px 0; font-weight: bold;">Nama Lengkap</td><td style="width: 70%;">: {s['nama']}</td></tr>
-                        <tr><td style="padding: 6px 0; font-weight: bold;">Nomor Anggota</td><td>: {s['no_anggota']}</td></tr>
-                        <tr><td style="padding: 6px 0; font-weight: bold;">Nominal Dana</td><td>: <b>Rp {s['nominal']:,}</b></td></tr>
-                        <tr><td style="padding: 6px 0; font-weight: bold;">Keperluan/Alasan</td><td>: {s['keperluan']}</td></tr>
-                        <tr><td style="padding: 6px 0; font-weight: bold;">Status Berkas</td><td>: <span style="background-color: #d4edda; color: #155724; padding: 2px 8px; border-radius: 4px; font-weight: bold;">VALID & SELESAI (ACC)</span></td></tr>
+                    <table style="width:100%; font-size:13px; margin-bottom:20px;">
+                        <tr><td><b>Nama Pemohon</b></td><td>: {s['nama']} ({s.get('unit')} - {s.get('lantai')})</td></tr>
+                        <tr><td><b>No Anggota</b></td><td>: {s['no_anggota']}</td></tr>
+                        <tr><td><b>Nominal Dana</b></td><td>: <b>Rp {s['nominal']:,}</b></td></tr>
+                        <tr><td><b>Keperluan</b></td><td>: {s['keperluan']}</td></tr>
                     </table>
-
-                    <h4 style="margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">LEMBAR VERIFIKASI TANDA TANGAN DIGITAL</h4>
-                    
-                    <div style="display: table; width: 100%; text-align: center; font-size: 11px;">
-                        <div style="display: table-row;">
-                            <div style="display: table-cell; width: 50%; padding-bottom: 15px;">
-                                <p style="margin: 0 0 5px 0; font-weight: bold;">1. Pihak Pengaju (Anggota)</p>
-                                <img src="data:image/png;base64,{s.get('ttd_pengaju', '')}" style="height: 70px; border: 1px dashed #ccc;" />
-                                <p style="margin: 3px 0 0 0; font-style: italic;">({s['nama']})</p>
+                    <div style="display:table; width:100%; text-align:center; font-size:11px;">
+                        <div style="display:table-row;">
+                            <div style="display:table-cell; width:50%; padding-bottom:10px;">
+                                <p style="margin:0 0 5px 0; font-weight:bold;">1. Pemohon (Anggota)</p>
+                                <img src="data:image/png;base64,{s.get('ttd_pengaju','')}" style="height:60px; border:1px dashed #ccc;"/>
                             </div>
-                            <div style="display: table-cell; width: 50%; padding-bottom: 15px;">
-                                <p style="margin: 0 0 5px 0; font-weight: bold;">2. Istri / Keluarga Pengaju</p>
-                                {"<img src='data:image/png;base64," + s['ttd_keluarga'] + "' style='height: 70px; border: 1px dashed #ccc;' />" if s.get('ttd_keluarga') else "<p style='color:red;height:70px;line-height:70px;'>[Tanpa TTD]</p>"}
-                                <p style="margin: 3px 0 0 0; font-style: italic;">(Penjamin Internal Keluarga)</p>
+                            <div style="display:table-cell; width:50%; padding-bottom:10px;">
+                                <p style="margin:0 0 5px 0; font-weight:bold;">2. Penjamin Istri/Keluarga</p>
+                                <img src="data:image/png;base64,{s.get('ttd_keluarga','')}" style="height:60px; border:1px dashed #ccc;"/>
                             </div>
                         </div>
-                        <div style="display: table-row;">
-                            <div style="display: table-cell; width: 50%; padding-bottom: 15px;">
-                                <p style="margin: 0 0 5px 0; font-weight: bold;">3. Kepala Divisi</p>
-                                {"<img src='data:image/png;base64," + s['ttd_kadiv'] + "' style='height: 70px; border: 1px dashed #ccc;' />" if s.get('ttd_kadiv') else "<p style='color:red;height:70px;line-height:70px;'>[Tanpa TTD]</p>"}
-                                <p style="margin: 3px 0 0 0; font-style: italic;">(Tim Verifikator I)</p>
+                        <div style="display:table-row;">
+                            <div style="display:table-cell; width:50%; padding-bottom:10px;">
+                                <p style="margin:0 0 5px 0; font-weight:bold;">3. Kepala Divisi Unit</p>
+                                <img src="data:image/png;base64,{s.get('ttd_kadiv','')}" style="height:60px; border:1px dashed #ccc;"/>
                             </div>
-                            <div style="display: table-cell; width: 50%; padding-bottom: 15px;">
-                                <p style="margin: 0 0 5px 0; font-weight: bold;">4. Kepala Bidang</p>
-                                {"<img src='data:image/png;base64," + s['ttd_kabid'] + "' style='height: 70px; border: 1px dashed #ccc;' />" if s.get('ttd_kabid') else "<p style='color:red;height:70px;line-height:70px;'>[Tanpa TTD]</p>"}
-                                <p style="margin: 3px 0 0 0; font-style: italic;">(Tim Verifikator II)</p>
+                            <div style="display:table-cell; width:50%; padding-bottom:10px;">
+                                <p style="margin:0 0 5px 0; font-weight:bold;">4. Kepala Bidang</p>
+                                <img src="data:image/png;base64,{s.get('ttd_kabid','')}" style="height:60px; border:1px dashed #ccc;"/>
                             </div>
                         </div>
-                        <div style="display: table-row;">
-                            <div style="display: table-cell; width: 50%;"></div>
-                            <div style="display: table-cell; width: 50%;">
-                                <p style="margin: 0 0 5px 0; font-weight: bold;">5. Direktur Koperasi</p>
-                                {"<img src='data:image/png;base64," + s['ttd_direktur'] + "' style='height: 70px; border: 1px dashed #ccc;' />" if s.get('ttd_direktur') else "<p style='color:red;height:70px;line-height:70px;'>[Tanpa TTD]</p>"}
-                                <p style="margin: 3px 0 0 0; font-style: italic;">(Pimpinan Tertinggi)</p>
+                        <div style="display:table-row;">
+                            <div style="display:table-cell; width:50%;"></div>
+                            <div style="display:table-cell; width:50%;">
+                                <p style="margin:0 0 5px 0; font-weight:bold;">5. Direktur Koperasi</p>
+                                <img src="data:image/png;base64,{s.get('ttd_direktur','')}" style="height:60px; border:1px dashed #ccc;"/>
                             </div>
                         </div>
                     </div>
                 </div>
-                
-                <script>
-                    setTimeout(function() {{
-                        var printContents = document.getElementById('print-area').innerHTML;
-                        var originalContents = document.body.innerHTML;
-                        document.body.innerHTML = printContents;
-                        window.print();
-                        document.body.innerHTML = originalContents;
-                    }}, 1000);
-                </script>
+                <script>setTimeout(function(){{ window.print(); }}, 800);</script>
                 """
-                st.components.v1.html(html_template, height=550, scrolling=True)
+                st.components.v1.html(html_template, height=450, scrolling=True)
+
+    # TAB 2: OTORISASI VALIDASI RESET PASSWORD PEJABAT
+    with tab2:
+        st.subheader("🔐 Permintaan Reset Password Pejabat Masuk")
+        st.write("Berikut adalah daftar akun Kepala Divisi/Pejabat yang terkunci karena lupa password. Silakan lakukan konfirmasi fisik/lisan sebelum meng-ACC password baru mereka.")
+        
+        pejabat_reset = [u for u in data_saat_ini["users"] if u.get("status_akun") == "Menunggu Reset"]
+        
+        if not pejabat_reset:
+            st.info("Aman! Tidak ada permintaan reset password pejabat saat ini.")
+            
+        for u_pej in pejabat_reset:
+            st.warning(f"⚠️ **Akun: {u_pej['username']}** — Nama: *{u_pej['nama']}* ({u_pej['unit']} - {u_pej['lantai']})")
+            st.write("Status: **Terkunci (Minta Reset Password Baru)**")
+            
+            c_res1, c_res2 = st.columns(2)
+            with c_res1:
+                if st.button(f"✅ Setujui & Aktifkan Password Baru ({u_pej['username']})"):
+                    u_pej["password"] = u_pej["password_baru"]  # Ganti password lama dengan password baru
+                    u_pej["password_baru"] = ""
+                    u_pej["status_akun"] = "Aktif"  # Buka gembok akun
+                    
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Approved Reset: {u_pej['username']}"):
+                        st.success(f"✅ Akun {u_pej['username']} berhasil diaktifkan dengan password baru!")
+                        time.sleep(1.2); st.rerun()
+            with c_res2:
+                if st.button(f"❌ Tolak / Batalkan Reset ({u_pej['username']})"):
+                    u_pej["password_baru"] = ""
+                    u_pej["status_akun"] = "Aktif"  # Kembalikan ke password lama saja
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Tolak Reset: {u_pej['username']}"):
+                        st.error("Permintaan reset ditolak, akun dikembalikan ke status normal.")
+                        time.sleep(1.2); st.rerun()

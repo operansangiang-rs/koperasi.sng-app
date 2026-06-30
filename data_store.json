@@ -108,16 +108,6 @@
     ],
     "users": [
         {
-            "username": "kadiv_bo1",
-            "nama": "Siti Aminah",
-            "role": "Kepala Divisi",
-            "unit": "Back Office",
-            "lantai": "Lantai 1",
-            "password": "123",
-            "status_akun": "Aktif",
-            "password_baru": ""
-        },
-        {
             "username": "rpu lt 1",
             "nama": "ratih",
             "role": "Kepala Divisi",

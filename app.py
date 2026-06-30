@@ -196,12 +196,6 @@ if role_aktif == "User Biasa":
     with st.form("form_pengajuan"):
         nama = st.text_input("Nama Lengkap Anggota Pemohon")
         no_anggota = st.text_input("No Anggota")
-        
-        c_lok1, c_lok2 = st.columns(2)
-        with c_lok1:
-            lantai_asal = st.selectbox("Pilih Lantai Asal Pengaju", ["Lantai 1", "Lantai 2", "Lantai 3", "Lantai 4", "Lantai 5", "Lantai 6"])
-        with c_lok2:
-            unit = st.selectbox("Asal Unit / Bagian", ["IT", "Back Office", "HRD", "Keuangan", "Produksi", "Umum"])
             
         st.markdown("---")
         st.write("<b>👤 Pilih Supervisor / Karu (Kepala Regu) Tujuan:</b>", unsafe_allow_html=True)
@@ -244,7 +238,6 @@ if role_aktif == "User Biasa":
             else:
                 st.session_state.preview_data = {
                     "nama": nama.strip(), "no_anggota": no_anggota.strip(), 
-                    "lantai_asal": lantai_asal, "unit": unit,
                     "target_karu": target_karu,
                     "nama_istri_saudara": nama_istri_saudara.strip(),
                     "nominal": nominal, "keperluan": keperluan.strip(),
@@ -256,7 +249,7 @@ if role_aktif == "User Biasa":
     if st.session_state.preview_data is not None:
         p = st.session_state.preview_data
         st.warning("⚠️ **Konfirmasi Pratinjau Berkas Sebelum Dikirim**")
-        st.info(f"**Pemohon:** {p['nama']} ({p['lantai_asal']} - {p['unit']})\n\n**Tujuan Karu:** *{p['target_karu']}* | **Penjamin:** *{p['nama_istri_saudara']}* \n\n**Nominal:** Rp {p['nominal']:,}")
+        st.info(f"**Pemohon:** {p['nama']} (No Anggota: {p['no_anggota']})\n\n**Tujuan Karu:** *{p['target_karu']}* | **Penjamin:** *{p['nama_istri_saudara']}* \n\n**Nominal:** Rp {p['nominal']:,}")
         
         c1, c2 = st.columns(2)
         with c1:
@@ -290,7 +283,7 @@ elif role_aktif == "Karu":
         st.markdown("### 📋 Berkas Pengajuan Masuk")
         st.success(f"Diajukan Kepada Anda (Karu Tujuan): **{item.get('target_karu')}**")
         
-        st.write(f"**Nama Pemohon:** {item['nama']} ({item.get('lantai_asal')} - {item.get('unit')})")
+        st.write(f"**Nama Pemohon:** {item['nama']} (No Anggota: {item['no_anggota']})")
         st.write(f"**Penjamin (Istri/Saudara):** **{item.get('nama_istri_saudara', '-')}**")
         st.write(f"**Nominal:** Rp {item['nominal']:,} | **Keperluan:** {item['keperluan']}")
         
@@ -448,7 +441,7 @@ elif role_aktif == "Admin":
                         <h3 style="margin:0;">FORMULIR PINJAMAN KOPERASI BERJENJANG</h3>
                     </div>
                     <table style="width:100%; font-size:13px; margin-bottom:20px;">
-                        <tr><td><b>Nama Pemohon</b></td><td>: {s['nama']} (Lantai: {s.get('lantai_asal')} - Unit: {s.get('unit')})</td></tr>
+                        <tr><td><b>Nama Pemohon</b></td><td>: {s['nama']}</td></tr>
                         <tr><td><b>No Anggota</b></td><td>: {s['no_anggota']}</td></tr>
                         <tr><td><b>Nominal Dana</b></td><td>: <b>Rp {s['nominal']:,}</b></td></tr>
                         <tr><td><b>Keperluan</b></td><td>: {s['keperluan']}</td></tr>

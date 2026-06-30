@@ -166,7 +166,7 @@ st.write(f"**Status Akses Saat Ini:** *{'User Pengaju (Anggota)' if role_aktif =
 st.write("---")
 
 # ---------------------------------------------------------------------
-# 📝 USER BIASA (FORMULIR PENGAJUAN + INPUT NAMA PEJABAT DI SINI)
+# 📝 USER BIASA (FORMULIR PENGAJUAN)
 # ---------------------------------------------------------------------
 if role_aktif == "User Biasa":
     st.subheader("📝 Formulir Pengajuan Berkas Pinjaman")
@@ -181,7 +181,7 @@ if role_aktif == "User Biasa":
             unit = st.selectbox("Asal Unit / Bagian", ["IT", "Back Office", "HRD", "Keuangan", "Produksi", "Umum"])
             
         st.markdown("---")
-        st.write("<b>👤 Input Pejabat yang Menyetujui (Pilih Area Anda):</b>", unsafe_allow_html=True)
+        st.write("<b>👤 Input Pejabat yang Menyetujui:</b>", unsafe_allow_html=True)
         nama_pejabat = st.text_input(f"Nama Kepala Divisi / Pejabat Terkait", placeholder="Masukkan nama pejabat yang bertugas di lantai tersebut...")
 
         st.markdown("---")
@@ -193,8 +193,10 @@ if role_aktif == "User Biasa":
             st.write("✒️ **Tanda Tangan Pemohon:**")
             cv_user = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=110, width=220, key="cv_user")
         with col_ttd2:
-            st.write("✒️ **Tanda Tangan Istri / Keluarga:**")
+            st.write("✒️ **Tanda Tangan Istri / Keluarga (Penjamin):**")
             cv_keluarga = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=110, width=220, key="cv_keluarga")
+            st.caption("*(Harap cantumkan nama jelas penjamin di bawah ini)*")
+            nama_istri_saudara = st.text_input("Nama Jelas Istri / Saudara", placeholder="Nama lengkap penjamin...")
         
         cek_review = st.form_submit_button("🔍 Tinjau & Cek Data")
         if cek_review:
@@ -205,13 +207,16 @@ if role_aktif == "User Biasa":
                 st.error("❌ Nama dan Nomor Anggota wajib diisi!")
             elif not nama_pejabat.strip():
                 st.error("❌ Nama Pejabat yang menyetujui wajib diisi!")
+            elif not nama_istri_saudara.strip():
+                st.error("❌ Nama Jelas Istri / Saudara wajib diisi!")
             elif not ttd_user or not ttd_keluarga:
                 st.error("❌ Tanda tangan Pemohon & Keluarga wajib dilengkapi!")
             else:
                 st.session_state.preview_data = {
                     "nama": nama.strip(), "no_anggota": no_anggota.strip(), 
                     "lantai_asal": lantai_asal, "unit": unit,
-                    "nama_pejabat": nama_pejabat.strip(), # Nama pejabat tersimpan dinamis dari pengaju
+                    "nama_pejabat": nama_pejabat.strip(), 
+                    "nama_istri_saudara": nama_istri_saudara.strip(), # Tersimpan dinamis
                     "nominal": nominal, "keperluan": keperluan.strip(),
                     "ttd_pengaju": ttd_user, "ttd_keluarga": ttd_keluarga,
                     "status": "Menunggu Verifikasi Kepala Divisi", 
@@ -221,7 +226,7 @@ if role_aktif == "User Biasa":
     if st.session_state.preview_data is not None:
         p = st.session_state.preview_data
         st.warning("⚠️ **Konfirmasi Pratinjau Berkas Sebelum Dikirim**")
-        st.info(f"**Nama Pemohon:** {p['nama']} ({p['lantai_asal']} - {p['unit']})\n\n**Verifikator:** {p['nama_pejabat']} | **Nominal:** Rp {p['nominal']:,}")
+        st.info(f"**Pemohon:** {p['nama']} ({p['lantai_asal']} - {p['unit']})\n\n**Penjamin:** *{p['nama_istri_saudara']}* \n\n**Verifikator:** {p['nama_pejabat']} | **Nominal:** Rp {p['nominal']:,}")
         
         c1, c2 = st.columns(2)
         with c1:
@@ -243,7 +248,6 @@ elif role_aktif == "Kepala Divisi":
     st.subheader(f"👋 Selamat Datang Pejabat Area: {lantai_aktif}")
     st.info("Anda berwenang meng-ACC berkas pengajuan yang masuk untuk lantai Anda.")
     
-    # Filter ketat hanya memunculkan data pengajuan dari lantai yang login saat ini
     items = [
         i for i in data_saat_ini["database"] 
         if i.get("status") == "Menunggu Verifikasi Kepala Divisi" and i.get("lantai_asal") == lantai_aktif
@@ -253,9 +257,9 @@ elif role_aktif == "Kepala Divisi":
         st.info(f"Bersih! Belum ada antrean berkas pinjaman untuk area {lantai_aktif}.")
         
     for idx, item in enumerate(items):
-        # Menampilkan Nama Pejabat yang diinput pemohon bersangkutan di kartunya
         st.markdown(f"### 📋 Berkas: {item['nama']} — Unit: {item.get('unit')}")
         st.write(f"**Diajukan ke (Nama Pejabat):** *{item.get('nama_pejabat', '-')}*")
+        st.write(f"**Penjamin (Istri/Saudara):** **{item.get('nama_istri_saudara', '-')}**")
         st.write(f"**Nominal:** Rp {item['nominal']:,} | **Keperluan:** {item['keperluan']}")
         
         c_img1, c_img2 = st.columns(2)
@@ -263,7 +267,7 @@ elif role_aktif == "Kepala Divisi":
             st.caption("Tanda Tangan Pemohon:")
             st.image(base64.b64decode(item["ttd_pengaju"]), width=120)
         with c_img2:
-            st.caption("Tanda Tangan Istri / Keluarga:")
+            st.caption(f"Tanda Tangan Penjamin ({item.get('nama_istri_saudara', 'Istri/Saudara')}):")
             st.image(base64.b64decode(item["ttd_keluarga"]), width=120)
             
         st.write(f"**Tanda Tangan ACC Kepala Divisi ({lantai_aktif}):**")
@@ -320,7 +324,7 @@ elif role_aktif == "SDM":
             col1, col2 = st.columns([4, 2])
             with col1: 
                 st.write(f"✅ **{s['nama']}** — {s.get('lantai_asal')} — Rp {s['nominal']:,}")
-                st.caption(f"Verifikator: {s.get('nama_pejabat', '-')}")
+                st.caption(f"Verifikator: {s.get('nama_pejabat', '-')} | Penjamin: <b>{s.get('nama_istri_saudara', '-')}</b>", unsafe_allow_html=True)
             with col2:
                 if st.button("🖨️ Buka Printer PDF", key=f"print_btn_{idx}"): st.session_state.print_id = s['no_anggota']
             
@@ -339,6 +343,7 @@ elif role_aktif == "SDM":
                         <tr><td><b>Nominal Dana</b></td><td>: <b>Rp {s['nominal']:,}</b></td></tr>
                         <tr><td><b>Keperluan</b></td><td>: {s['keperluan']}</td></tr>
                         <tr><td><b>Kepala Divisi (ACC)</b></td><td>: {s.get('nama_pejabat', '-')}</td></tr>
+                        <tr><td><b>Penjamin (Istri/Saudara)</b></td><td>: {s.get('nama_istri_saudara', '-')}</td></tr>
                     </table>
                     <div style="display:table; width:100%; text-align:center; font-size:11px;">
                         <div style="display:table-row;">
@@ -347,7 +352,7 @@ elif role_aktif == "SDM":
                                 <img src="data:image/png;base64,{s.get('ttd_pengaju','')}" style="height:50px; border:1px dashed #ccc;"/>
                             </div>
                             <div style="display:table-cell; width:50%; padding-bottom:10px;">
-                                <p style="margin:0 0 5px 0; font-weight:bold;">2. Penjamin Keluarga</p>
+                                <p style="margin:0 0 5px 0; font-weight:bold;">2. Penjamin: {s.get('nama_istri_saudara','')}</p>
                                 <img src="data:image/png;base64,{s.get('ttd_keluarga','')}" style="height:50px; border:1px dashed #ccc;"/>
                             </div>
                         </div>

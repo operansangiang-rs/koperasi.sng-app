@@ -24,7 +24,6 @@ TEMPLATE_AWAL = {"database": [], "categories": ["Pinjaman Rutin", "Pinjaman Daru
 # --- Fungsi Helper: Konversi Canvas ke Base64 ---
 def canvas_to_base64(canvas_data):
     if canvas_data is not None:
-        # Periksa apakah ada goresan tanda tangan di kanvas
         if canvas_data.any():
             img = Image.fromarray(canvas_data.astype('uint8'), 'RGBA')
             buffered = io.BytesIO()
@@ -120,6 +119,7 @@ else:
                     }
                     data_saat_ini["database"].append(new_data)
                     if push_database_to_github(data_saat_ini, sha_saat_ini, f"Baru: {nama}"):
+                        st.toast(f"🎉 Notifikasi: Pengajuan baru atas nama {nama} berhasil disimpan!", icon="💾")
                         st.success("✅ Pengajuan berhasil dikirim!")
                         st.rerun()
 
@@ -131,27 +131,29 @@ else:
         if not items: 
             st.info("Belum ada pengajuan baru yang memerlukan verifikasi Kepala Divisi.")
         for idx, item in enumerate(items):
-            with st.expander(f"Pengajuan {item['nama']} - Rp {item['nominal']:,}"):
-                st.write(f"**No Anggota:** {item['no_anggota']}")
-                st.write(f"**Keperluan:** {item['keperluan']}")
-                st.write("---")
-                st.write("**Silakan Tanda Tangan Kepala Divisi untuk Menyetujui:**")
-                cv_div = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=150, width=300, key=f"cv_div_{idx}")
-                
-                if st.button("Setujui & Tanda Tangan", key=f"btn_div_{idx}"):
-                    ttd_div = canvas_to_base64(cv_div.image_data)
-                    if not ttd_div:
-                        st.error("❌ Anda wajib tanda tangan sebelum menyetujui!")
-                    else:
-                        # SIMPAN TTD KADIV LANGSUNG KE DALAM ITEM DATABASE
-                        for d in data_saat_ini["database"]:
-                            if d["no_anggota"] == item["no_anggota"] and d.get("status", "Menunggu Divisi") == "Menunggu Divisi":
-                                d["status"] = "Menunggu Bidang"
-                                d["ttd_kadiv"] = ttd_div  # Mengunci tanda tangan kadiv
-                                break
-                        if push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Kadiv: {item['nama']}"):
-                            st.success("✅ Berhasil disetujui! Dialihkan ke Kepala Bidang.")
-                            st.rerun()
+            # Diubah menggunakan penataan box datar, bukan expander agar canvas ter-render sempurna
+            st.markdown(f"### 📋 Pengajuan: {item['nama']} — Rp {item['nominal']:,}")
+            st.write(f"**No Anggota:** {item['no_anggota']}")
+            st.write(f"**Keperluan:** {item['keperluan']}")
+            st.write("**Silakan Tanda Tangan Kepala Divisi untuk Menyetujui:**")
+            
+            cv_div = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=150, width=300, key=f"cv_div_{idx}")
+            
+            if st.button("✍️ Setujui & Kirim Tanda Tangan", key=f"btn_div_{idx}"):
+                ttd_div = canvas_to_base64(cv_div.image_data)
+                if not ttd_div:
+                    st.error("❌ Anda wajib tanda tangan sebelum menyetujui!")
+                else:
+                    for d in data_saat_ini["database"]:
+                        if d["no_anggota"] == item["no_anggota"] and d.get("status", "Menunggu Divisi") == "Menunggu Divisi":
+                            d["status"] = "Menunggu Bidang"
+                            d["ttd_kadiv"] = ttd_div
+                            break
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Kadiv: {item['nama']}"):
+                        st.toast(f"🔔 Notifikasi: Kepala Divisi menyetujui pengajuan {item['nama']}!", icon="✅")
+                        st.success("✅ Berhasil disetujui! Dialihkan ke Kepala Bidang.")
+                        st.rerun()
+            st.write("---")
 
     # ---------------------------------------------------------------------
     # ✅ KEPALA BIDANG
@@ -160,26 +162,28 @@ else:
         items = [i for i in data_saat_ini["database"] if i.get("status") == "Menunggu Bidang"]
         if not items: st.info("Tidak ada data yang menunggu verifikasi Kepala Bidang.")
         for idx, item in enumerate(items):
-            with st.expander(f"Dari: {item['nama']} - Rp {item['nominal']:,}"):
-                st.write(f"**No Anggota:** {item['no_anggota']}")
-                st.write(f"**Keperluan:** {item['keperluan']}")
-                st.write("---")
-                st.write("**Silakan Tanda Tangan Kepala Bidang:**")
-                cv_bid = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=150, width=300, key=f"cv_bid_{idx}")
-                
-                if st.button("Verifikasi Kepala Bidang", key=f"btn_bid_{idx}"):
-                    ttd_bid = canvas_to_base64(cv_bid.image_data)
-                    if not ttd_bid:
-                        st.error("❌ Anda wajib tanda tangan!")
-                    else:
-                        for d in data_saat_ini["database"]:
-                            if d["no_anggota"] == item["no_anggota"] and d.get("status") == "Menunggu Bidang":
-                                d["status"] = "Menunggu Direktur"
-                                d["ttd_kabid"] = ttd_bid  # Mengunci tanda tangan kabid
-                                break
-                        if push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Kabid: {item['nama']}"):
-                            st.success("✅ Berhasil disetujui Kabid! Dialihkan ke Direktur.")
-                            st.rerun()
+            st.markdown(f"### 📋 Dari: {item['nama']} — Rp {item['nominal']:,}")
+            st.write(f"**No Anggota:** {item['no_anggota']}")
+            st.write(f"**Keperluan:** {item['keperluan']}")
+            st.write("**Silakan Tanda Tangan Kepala Bidang:**")
+            
+            cv_bid = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=150, width=300, key=f"cv_bid_{idx}")
+            
+            if st.button("✍️ Verifikasi & Tanda Tangan Kabid", key=f"btn_bid_{idx}"):
+                ttd_bid = canvas_to_base64(cv_bid.image_data)
+                if not ttd_bid:
+                    st.error("❌ Anda wajib tanda tangan!")
+                else:
+                    for d in data_saat_ini["database"]:
+                        if d["no_anggota"] == item["no_anggota"] and d.get("status") == "Menunggu Bidang":
+                            d["status"] = "Menunggu Direktur"
+                            d["ttd_kabid"] = ttd_bid
+                            break
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Kabid: {item['nama']}"):
+                        st.toast(f"🔔 Notifikasi: Kepala Bidang menyetujui pengajuan {item['nama']}!", icon="✅")
+                        st.success("✅ Berhasil disetujui Kabid! Dialihkan ke Direktur.")
+                        st.rerun()
+            st.write("---")
 
     # ---------------------------------------------------------------------
     # ✅ DIREKTUR
@@ -188,26 +192,27 @@ else:
         items = [i for i in data_saat_ini["database"] if i.get("status") == "Menunggu Direktur"]
         if not items: st.info("Tidak ada data yang menunggu verifikasi Direktur.")
         for idx, item in enumerate(items):
-            with st.expander(f"Persetujuan Direktur: {item['nama']}"):
-                st.write(f"**Nominal:** Rp {item['nominal']:,}")
-                st.write(f"**Keperluan:** {item['keperluan']}")
-                st.write("---")
-                st.write("**Tanda Tangan Direktur:**")
-                cv_dir = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=150, width=300, key=f"cv_dir_{idx}")
-                
-                if st.button("Setujui (Direktur)", key=f"btn_dir_{idx}"):
-                    ttd_dir = canvas_to_base64(cv_dir.image_data)
-                    if not ttd_dir:
-                        st.error("❌ Anda wajib tanda tangan!")
-                    else:
-                        for d in data_saat_ini["database"]:
-                            if d["no_anggota"] == item["no_anggota"] and d.get("status") == "Menunggu Direktur":
-                                d["status"] = "Menunggu SDM"
-                                d["ttd_direktur"] = ttd_dir  # Mengunci tanda tangan direktur
-                                break
-                        if push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Direktur: {item['nama']}"):
-                            st.success("✅ Berhasil disetujui Direktur! Dialihkan ke SDM.")
-                            st.rerun()
+            st.markdown(f"### 📋 Persetujuan Direktur: {item['nama']} — Rp {item['nominal']:,}")
+            st.write(f"**Keperluan:** {item['keperluan']}")
+            st.write("**Tanda Tangan Direktur:**")
+            
+            cv_dir = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=150, width=300, key=f"cv_dir_{idx}")
+            
+            if st.button("✍️ Setujui (Direktur)", key=f"btn_dir_{idx}"):
+                ttd_dir = canvas_to_base64(cv_dir.image_data)
+                if not ttd_dir:
+                    st.error("❌ Anda wajib tanda tangan!")
+                else:
+                    for d in data_saat_ini["database"]:
+                        if d["no_anggota"] == item["no_anggota"] and d.get("status") == "Menunggu Direktur":
+                            d["status"] = "Menunggu SDM"
+                            d["ttd_direktur"] = ttd_dir
+                            break
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Direktur: {item['nama']}"):
+                        st.toast(f"📢 Notifikasi: Direktur telah menyetujui dana {item['nama']}!", icon="🏛️")
+                        st.success("✅ Berhasil disetujui Direktur! Dialihkan ke SDM.")
+                        st.rerun()
+            st.write("---")
 
     # ---------------------------------------------------------------------
     # ✅ SDM (FINAL ACC & CETAK)
@@ -216,23 +221,22 @@ else:
         items = [i for i in data_saat_ini["database"] if i.get("status") == "Menunggu SDM"]
         if not items: st.info("Tidak ada pengajuan yang siap di-ACC.")
         for idx, item in enumerate(items):
-            with st.expander(f"Final ACC: {item['nama']} - Rp {item['nominal']:,}"):
-                st.write(f"**Nama:** {item['nama']} | **No Anggota:** {item['no_anggota']}")
-                st.write(f"**Keperluan:** {item['keperluan']}")
-                st.write("---")
-                
-                # SDM Bisa memantau & memverifikasi TTD Pengaju sebelum cetak
-                st.write("**Lembar Tanda Tangan Pengaju (Anggota):**")
-                if item.get("ttd_pengaju"):
-                    st.image(base64.b64decode(item["ttd_pengaju"]), width=200)
+            st.markdown(f"### 📋 Final ACC SDM: {item['nama']} — Rp {item['nominal']:,}")
+            st.write(f"**No Anggota:** {item['no_anggota']} | **Keperluan:** {item['keperluan']}")
+            
+            st.write("**Lembar Tanda Tangan Pengaju (Anggota):**")
+            if item.get("ttd_pengaju"):
+                st.image(base64.b64decode(item["ttd_pengaju"]), width=200)
 
-                if st.button("ACC FINAL & NYATAKAN SELESAI", key=f"btn_sdm_{idx}"):
-                    for d in data_saat_ini["database"]:
-                        if d["no_anggota"] == item["no_anggota"] and d.get("status") == "Menunggu SDM":
-                            d["status"] = "SELESAI"
-                            break
-                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Final ACC SDM: {item['nama']}"):
-                        st.success("Proses Selesai dan disimpan!"); st.rerun()
+            if st.button("🔒 ACC FINAL & NYATAKAN SELESAI", key=f"btn_sdm_{idx}"):
+                for d in data_saat_ini["database"]:
+                    if d["no_anggota"] == item["no_anggota"] and d.get("status") == "Menunggu SDM":
+                        d["status"] = "SELESAI"
+                        break
+                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Final ACC SDM: {item['nama']}"):
+                    st.toast(f"🏁 Notifikasi: Berkas {item['nama']} dinyatakan SELESAI & Sah!", icon="🎉")
+                    st.success("Proses Selesai dan disimpan!"); st.rerun()
+            st.write("---")
 
         st.write("---")
         st.subheader("🖨️ Riwayat Selesai (Siap Cetak Dokumen)")
@@ -246,7 +250,6 @@ else:
                 st.write(f"Nominal: Rp {s['nominal']:,}")
                 st.write(f"Status Pengajuan: **ACC SEPENUHNYA OLEH SEMUA PEJABAT**")
                 
-                # Tombol Download cetak berkas
                 txt_report = f"=========================================\n" \
                              f"         FORMULIR PINJAMAN KOPERASI      \n" \
                              f"=========================================\n" \
@@ -256,10 +259,10 @@ else:
                              f"Keperluan      : {s['keperluan']}\n\n" \
                              f"STATUS VERIFIKASI: VALID & SELESAI\n" \
                              f"-----------------------------------------\n" \
-                             f"Tanda Tangan Pengaju   : [TERKUNCI: BASE64_DATA]\n" \
-                             f"Tanda Tangan Kadiv     : [TERKUNCI: BASE64_DATA]\n" \
-                             f"Tanda Tangan Kabid     : [TERKUNCI: BASE64_DATA]\n" \
-                             f"Tanda Tangan Direktur  : [TERKUNCI: BASE64_DATA]\n" \
+                             f"Tanda Tangan Pengaju   : [TERKUNCI]\n" \
+                             f"Tanda Tangan Kadiv     : [TERKUNCI]\n" \
+                             f"Tanda Tangan Kabid     : [TERKUNCI]\n" \
+                             f"Tanda Tangan Direktur  : [TERKUNCI]\n" \
                              f"========================================="
                              
                 st.download_button(f"📥 Unduh Form Dokumen {s['nama']}", txt_report, file_name=f"Form_Koperasi_{s['nama']}.txt", key=f"dl_{idx}")

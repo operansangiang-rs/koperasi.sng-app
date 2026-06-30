@@ -119,7 +119,7 @@ else:
                     }
                     data_saat_ini["database"].append(new_data)
                     if push_database_to_github(data_saat_ini, sha_saat_ini, f"Baru: {nama}"):
-                        st.toast(f"🎉 Notifikasi: Pengajuan baru atas nama {nama} berhasil disimpan!", icon="💾")
+                        st.toast(f"💾 Notifikasi: Pengajuan baru atas nama {nama} berhasil disimpan ke server GitHub!", icon="💾")
                         st.success("✅ Pengajuan berhasil dikirim!")
                         st.rerun()
 
@@ -131,7 +131,6 @@ else:
         if not items: 
             st.info("Belum ada pengajuan baru yang memerlukan verifikasi Kepala Divisi.")
         for idx, item in enumerate(items):
-            # Diubah menggunakan penataan box datar, bukan expander agar canvas ter-render sempurna
             st.markdown(f"### 📋 Pengajuan: {item['nama']} — Rp {item['nominal']:,}")
             st.write(f"**No Anggota:** {item['no_anggota']}")
             st.write(f"**Keperluan:** {item['keperluan']}")
@@ -150,7 +149,7 @@ else:
                             d["ttd_kadiv"] = ttd_div
                             break
                     if push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Kadiv: {item['nama']}"):
-                        st.toast(f"🔔 Notifikasi: Kepala Divisi menyetujui pengajuan {item['nama']}!", icon="✅")
+                        st.toast(f"✅ Notifikasi: Persetujuan Kepala Divisi untuk {item['nama']} BERHASIL DISIMPAN!", icon="📝")
                         st.success("✅ Berhasil disetujui! Dialihkan ke Kepala Bidang.")
                         st.rerun()
             st.write("---")
@@ -180,7 +179,7 @@ else:
                             d["ttd_kabid"] = ttd_bid
                             break
                     if push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Kabid: {item['nama']}"):
-                        st.toast(f"🔔 Notifikasi: Kepala Bidang menyetujui pengajuan {item['nama']}!", icon="✅")
+                        st.toast(f"✅ Notifikasi: Persetujuan Kepala Bidang untuk {item['nama']} BERHASIL DISIMPAN!", icon="💼")
                         st.success("✅ Berhasil disetujui Kabid! Dialihkan ke Direktur.")
                         st.rerun()
             st.write("---")
@@ -209,15 +208,19 @@ else:
                             d["ttd_direktur"] = ttd_dir
                             break
                     if push_database_to_github(data_saat_ini, sha_saat_ini, f"Setuju Direktur: {item['nama']}"):
-                        st.toast(f"📢 Notifikasi: Direktur telah menyetujui dana {item['nama']}!", icon="🏛️")
+                        st.toast(f"🏛️ Notifikasi: Persetujuan Direktur untuk {item['nama']} BERHASIL DISIMPAN!", icon="🚀")
                         st.success("✅ Berhasil disetujui Direktur! Dialihkan ke SDM.")
                         st.rerun()
             st.write("---")
 
     # ---------------------------------------------------------------------
-    # ✅ SDM (FINAL ACC & CETAK)
+    # ✅ SDM (FINAL ACC & PRINT PDF LENGKAP DENGAN TTD)
     # ---------------------------------------------------------------------
     elif role == "SDM":
+        # Inisialisasi state untuk dokumen yang sedang dicetak
+        if "print_id" not in st.session_state:
+            st.session_state.print_id = None
+
         items = [i for i in data_saat_ini["database"] if i.get("status") == "Menunggu SDM"]
         if not items: st.info("Tidak ada pengajuan yang siap di-ACC.")
         for idx, item in enumerate(items):
@@ -234,35 +237,87 @@ else:
                         d["status"] = "SELESAI"
                         break
                 if push_database_to_github(data_saat_ini, sha_saat_ini, f"Final ACC SDM: {item['nama']}"):
-                    st.toast(f"🏁 Notifikasi: Berkas {item['nama']} dinyatakan SELESAI & Sah!", icon="🎉")
+                    st.toast(f"🏁 Notifikasi: Berkas {item['nama']} BERHASIL DISIMPAN & Status SELESAI!", icon="🎉")
                     st.success("Proses Selesai dan disimpan!"); st.rerun()
             st.write("---")
 
         st.write("---")
-        st.subheader("🖨️ Riwayat Selesai (Siap Cetak Dokumen)")
+        st.subheader("🖨️ Riwayat Selesai (Siap Cetak PDF Resmi)")
         selesais = [i for i in data_saat_ini["database"] if i.get("status") == "SELESAI"]
         
         if not selesais:
-            st.text("Belum ada formulir berkas yang berstatus SELESAI.")
+            st.text("Belum ada berkas formulir berstatus SELESAI.")
+        
         for idx, s in enumerate(selesais):
-            with st.expander(f"📄 Berkas: {s['nama']} (Lengkap)"):
-                st.write(f"Nama: {s['nama']}")
-                st.write(f"Nominal: Rp {s['nominal']:,}")
-                st.write(f"Status Pengajuan: **ACC SEPENUHNYA OLEH SEMUA PEJABAT**")
+            col1, col2 = st.columns([4, 2])
+            with col1:
+                st.write(f"✅ **{s['nama']}** — Rp {s['nominal']:,}")
+            with col2:
+                if st.button("🖨️ Cetak Berkas PDF", key=f"print_btn_{idx}"):
+                    st.session_state.print_id = s['no_anggota']
+                    st.toast(f"🖨️ Membuka jendela cetak untuk {s['nama']}...", icon="📄")
+
+            # Blok Kode Render Template Print jika tombol diklik
+            if st.session_state.print_id == s['no_anggota']:
+                st.info(f"Tekan tombol printer bawaan laptop/HP Anda untuk menyimpannya sebagai **Save as PDF**.")
                 
-                txt_report = f"=========================================\n" \
-                             f"         FORMULIR PINJAMAN KOPERASI      \n" \
-                             f"=========================================\n" \
-                             f"Nama Anggota   : {s['nama']}\n" \
-                             f"Nomor Anggota  : {s['no_anggota']}\n" \
-                             f"Nominal        : Rp {s['nominal']:,}\n" \
-                             f"Keperluan      : {s['keperluan']}\n\n" \
-                             f"STATUS VERIFIKASI: VALID & SELESAI\n" \
-                             f"-----------------------------------------\n" \
-                             f"Tanda Tangan Pengaju   : [TERKUNCI]\n" \
-                             f"Tanda Tangan Kadiv     : [TERKUNCI]\n" \
-                             f"Tanda Tangan Kabid     : [TERKUNCI]\n" \
-                             f"Tanda Tangan Direktur  : [TERKUNCI]\n" \
-                             f"========================================="
-                             
-                st.download_button(f"📥 Unduh Form Dokumen {s['nama']}", txt_report, file_name=f"Form_Koperasi_{s['nama']}.txt", key=f"dl_{idx}")
+                # Desain Berkas Nota/Formulir HTML Resmi Koperasi Khusus Cetak
+                html_template = f"""
+                <div id="print-area" style="padding: 25px; border: 2px solid #333; font-family: Arial, sans-serif; background-color: white; color: black; max-width: 700px; margin: auto;">
+                    <div style="text-align: center; border-bottom: 3px double #333; padding-bottom: 10px; margin-bottom: 20px;">
+                        <h2 style="margin: 0; text-transform: uppercase;">FORMULIR RESMI PINJAMAN KOPERASI</h2>
+                        <p style="margin: 5px 0 0 0; font-size: 13px;">Sistem Otomasi Verifikasi Berjenjang Elektronik</p>
+                    </div>
+                    
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 30px;">
+                        <tr><td style="width: 30%; padding: 6px 0; font-weight: bold;">Nama Lengkap</td><td style="width: 70%;">: {s['nama']}</td></tr>
+                        <tr><td style="padding: 6px 0; font-weight: bold;">Nomor Anggota</td><td>: {s['no_anggota']}</td></tr>
+                        <tr><td style="padding: 6px 0; font-weight: bold;">Nominal Dana</td><td>: <b>Rp {s['nominal']:,}</b></td></tr>
+                        <tr><td style="padding: 6px 0; font-weight: bold;">Keperluan/Alasan</td><td>: {s['keperluan']}</td></tr>
+                        <tr><td style="padding: 6px 0; font-weight: bold;">Status Berkas</td><td>: <span style="background-color: #d4edda; color: #155724; padding: 2px 8px; border-radius: 4px; font-weight: bold;">VALID & SELESAI (ACC)</span></td></tr>
+                    </table>
+
+                    <h4 style="margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">LEMBAR VERIFIKASI TANDA TANGAN DIGITAL</h4>
+                    
+                    <div style="display: table; width: 100%; text-align: center; font-size: 12px; margin-top: 15px;">
+                        <div style="display: table-row;">
+                            <div style="display: table-cell; width: 50%; padding-bottom: 20px;">
+                                <p style="margin: 0 0 5px 0; font-weight: bold;">1. Pihak Pengaju (Anggota)</p>
+                                <img src="data:image/png;base64,{s.get('ttd_pengaju', '')}" style="height: 80px; border: 1px dashed #ccc;" />
+                                <p style="margin: 5px 0 0 0; font-style: italic;">({s['nama']})</p>
+                            </div>
+                            <div style="display: table-cell; width: 50%; padding-bottom: 20px;">
+                                <p style="margin: 0 0 5px 0; font-weight: bold;">2. Kepala Divisi</p>
+                                {"<img src='data:image/png;base64," + s['ttd_kadiv'] + "' style='height: 80px; border: 1px dashed #ccc;' />" if s.get('ttd_kadiv') else "<p style='color:red;height:80px;line-height:80px;'>[Tanpa TTD]</p>"}
+                                <p style="margin: 5px 0 0 0; font-style: italic;">(Tim Verifikator I)</p>
+                            </div>
+                        </div>
+                        <div style="display: table-row;">
+                            <div style="display: table-cell; width: 50%;">
+                                <p style="margin: 0 0 5px 0; font-weight: bold;">3. Kepala Bidang</p>
+                                {"<img src='data:image/png;base64," + s['ttd_kabid'] + "' style='height: 80px; border: 1px dashed #ccc;' />" if s.get('ttd_kabid') else "<p style='color:red;height:80px;line-height:80px;'>[Tanpa TTD]</p>"}
+                                <p style="margin: 5px 0 0 0; font-style: italic;">(Tim Verifikator II)</p>
+                            </div>
+                            <div style="display: table-cell; width: 50%;">
+                                <p style="margin: 0 0 5px 0; font-weight: bold;">4. Direktur Koperasi</p>
+                                {"<img src='data:image/png;base64," + s['ttd_direktur'] + "' style='height: 80px; border: 1px dashed #ccc;' />" if s.get('ttd_direktur') else "<p style='color:red;height:80px;line-height:80px;'>[Tanpa TTD]</p>"}
+                                <p style="margin: 5px 0 0 0; font-style: italic;">(Pimpinan Tertinggi)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <script>
+                    // Otomatis mentrigger fungsi print jendela browser agar bisa save PDF langsung
+                    setTimeout(function() {{
+                        var printContents = document.getElementById('print-area').innerHTML;
+                        var originalContents = document.body.innerHTML;
+                        document.body.innerHTML = printContents;
+                        window.print();
+                        document.body.innerHTML = originalContents;
+                        window.location.reload();
+                    }}, 1000);
+                </script>
+                """
+                # Tampilkan Preview Dokumen Resmi di Web Streamlit sebelum terdownload
+                st.components.v1.html(html_template, height=550, scrolling=True)

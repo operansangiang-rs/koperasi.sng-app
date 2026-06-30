@@ -48,8 +48,6 @@ def canvas_to_base64(canvas_data):
 def load_data_from_github():
     if GITHUB_TOKEN.startswith("ghp_") and "/" in REPO_NAME:
         url = f"https://api.github.com/repos/{REPO_NAME}/contents/{DB_FILE}"
-        headers = {"Authorization": f"token GITHUB_TOKEN", "Accept": "application/vnd.github.v3+json"}
-        # Perbaikan otorisasi token github
         headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
@@ -119,7 +117,6 @@ if menu_login == "Masuk Aplikasi":
         }
         target_role = role_mapping[role_pilihan]
         
-        # Sinkronisasi variabel data_saat_ini
         user_list = [u["username"] for u in data_saat_ini["users"] if u["role"] == target_role]
         
         if not user_list:
@@ -284,7 +281,7 @@ elif role_aktif == "Karu":
         st.markdown("### 📋 Berkas Pengajuan Perlu Diproses")
         st.success(f"Ditujukan Kepada Anda (Karu): **{item.get('target_karu')}**")
         
-        st.write(f"**Nama Pemohon:** {item['nama']} (No Anggota: {item['no_anggota']})")
+        st.write(f"**Nama Pengaju (Pemohon):** **{item['nama']}** (No: {item['no_anggota']})")
         st.write(f"**Penjamin (Istri/Saudara):** **{item.get('nama_istri_saudara', '-')}**")
         st.write(f"**Nominal:** Rp {item['nominal']:,} | **Keperluan:** {item['keperluan']}")
         
@@ -320,8 +317,8 @@ elif role_aktif == "Karu":
     if not data_saat_ini["database"]:
         st.info("Belum ada data pengajuan sama sekali.")
     for idx_all, db_item in enumerate(data_saat_ini["database"]):
-        with st.expander(f"Berkas: {db_item['nama']} — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
-            st.write(f"**Nama Pemohon:** {db_item['nama']} (No: {db_item['no_anggota']})")
+        with st.expander(f"Berkas: **{db_item['nama']}** — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
+            st.write(f"**Nama Pengaju (Pemohon):** **{db_item['nama']}** (No: {db_item['no_anggota']})")
             st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
             st.write(f"**Nominal:** Rp {db_item['nominal']:,}")
             st.write(f"**Keperluan:** {db_item['keperluan']}")
@@ -338,7 +335,8 @@ elif role_aktif == "Kabid":
         st.info("Tidak ada berkas yang menunggu verifikasi Kabid saat ini.")
         
     for idx, item in enumerate(items_kabid):
-        st.markdown(f"### Berkas Perlu Diproses: {item['nama']} — Status: **{item['status']}**")
+        st.markdown(f"### Berkas Perlu Diproses: **{item['nama']}** — Status: **{item['status']}**")
+        st.write(f"**Nama Pengaju (Pemohon):** **{item['nama']}**")
         st.write(f"**Dari Karu Tujuan:** *{item.get('target_karu', '-')}* | **Rp {item['nominal']:,}** | **Keperluan:** {item['keperluan']}")
         
         st.write(f"**Tanda Tangan ACC Kepala Bidang (Kabid):**")
@@ -364,8 +362,8 @@ elif role_aktif == "Kabid":
     if not data_saat_ini["database"]:
         st.info("Belum ada data pengajuan sama sekali.")
     for idx_all, db_item in enumerate(data_saat_ini["database"]):
-        with st.expander(f"Berkas: {db_item['nama']} — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
-            st.write(f"**Nama Pemohon:** {db_item['nama']} (No: {db_item['no_anggota']})")
+        with st.expander(f"Berkas: **{db_item['nama']}** — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
+            st.write(f"**Nama Pengaju (Pemohon):** **{db_item['nama']}** (No: {db_item['no_anggota']})")
             st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
             st.write(f"**Nominal:** Rp {db_item['nominal']:,}")
             st.write(f"**Keperluan:** {db_item['keperluan']}")
@@ -382,7 +380,8 @@ elif role_aktif == "Direktur":
         st.info("Tidak ada berkas yang menunggu ACC Direktur saat ini.")
         
     for idx, item in enumerate(items_dir):
-        st.markdown(f"### Berkas Perlu Diproses: {item['nama']} — Status: **{item['status']}**")
+        st.markdown(f"### Berkas Perlu Diproses: **{item['nama']}** — Status: **{item['status']}**")
+        st.write(f"**Nama Pengaju (Pemohon):** **{item['nama']}**")
         st.write(f"**Dari Karu:** *{item.get('target_karu', '-')}* | **Rp {item['nominal']:,}** | **Keperluan:** {item['keperluan']}")
         
         st.write(f"**Tanda Tangan ACC Direktur Utama:**")
@@ -408,8 +407,8 @@ elif role_aktif == "Direktur":
     if not data_saat_ini["database"]:
         st.info("Belum ada data pengajuan sama sekali.")
     for idx_all, db_item in enumerate(data_saat_ini["database"]):
-        with st.expander(f"Berkas: {db_item['nama']} — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
-            st.write(f"**Nama Pemohon:** {db_item['nama']} (No: {db_item['no_anggota']})")
+        with st.expander(f"Berkas: **{db_item['nama']}** — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
+            st.write(f"**Nama Pengaju (Pemohon):** **{db_item['nama']}** (No: {db_item['no_anggota']})")
             st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
             st.write(f"**Nominal:** Rp {db_item['nominal']:,}")
             st.write(f"**Keperluan:** {db_item['keperluan']}")
@@ -429,15 +428,15 @@ elif role_aktif == "SDM":
         selesais_sdm = [i for i in data_saat_ini["database"] if i.get("status") == "SELESAI"]
         if not selesais_sdm: st.info("Belum ada arsip data yang berstatus selesai.")
         for s_item in selesais_sdm:
-            st.write(f"• **{s_item['nama']}** — Rp {s_item['nominal']:,} (Karu: {s_item.get('target_karu')}) — Keperluan: {s_item['keperluan']}")
+            st.write(f"• Pengaju: **{s_item['nama']}** — Rp {s_item['nominal']:,} (Karu: {s_item.get('target_karu')}) — Keperluan: {s_item['keperluan']}")
             
     with tab_sdm2:
         st.subheader("👁️ Transparansi: Pemantauan Seluruh Pengajuan Berjalan")
         if not data_saat_ini["database"]:
             st.info("Belum ada data pengajuan sama sekali.")
         for idx_all, db_item in enumerate(data_saat_ini["database"]):
-            with st.expander(f"Berkas: {db_item['nama']} — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
-                st.write(f"**Nama Pemohon:** {db_item['nama']} (No: {db_item['no_anggota']})")
+            with st.expander(f"Berkas: **{db_item['nama']}** — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
+                st.write(f"**Nama Pengaju (Pemohon):** **{db_item['nama']}** (No: {db_item['no_anggota']})")
                 st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
                 st.write(f"**Nominal:** Rp {db_item['nominal']:,}")
                 st.write(f"**Keperluan:** {db_item['keperluan']}")
@@ -462,7 +461,7 @@ elif role_aktif == "Admin":
         if not items_all: st.info("Semua berkas pengajuan sudah berstatus SELESAI.")
         
         for idx, it in enumerate(items_all):
-            st.write(f"• **{it['nama']}** — Karu Tujuan: *{it.get('target_karu')}* — Status: *{it['status']}*")
+            st.write(f"• Pengaju: **{it['nama']}** — Karu Tujuan: *{it.get('target_karu')}* — Status: *{it['status']}*")
             if st.button(f"Selesaikan Paksa ({it['nama']})", key=f"force_done_{idx}"):
                 for d in data_saat_ini["database"]:
                     if str(d["no_anggota"]).strip() == str(it["no_anggota"]).strip() and d.get("status") == it["status"]:
@@ -480,7 +479,7 @@ elif role_aktif == "Admin":
         for idx, s in enumerate(selesais):
             col1, col2 = st.columns([4, 2])
             with col1: 
-                st.write(f"✅ **{s['nama']}** — Karu: {s.get('target_karu', '-')} — Rp {s['nominal']:,}")
+                st.write(f"✅ Pengaju: **{s['nama']}** — Karu: {s.get('target_karu', '-')} — Rp {s['nominal']:,}")
             with col2:
                 if st.button("🖨️ Buka Printer PDF", key=f"print_btn_{idx}"): st.session_state.print_id = s['no_anggota']
             
@@ -494,7 +493,7 @@ elif role_aktif == "Admin":
                         <h3 style="margin:0;">FORMULIR PINJAMAN KOPERASI BERJENJANG</h3>
                     </div>
                     <table style="width:100%; font-size:13px; margin-bottom:20px;">
-                        <tr><td><b>Nama Pemohon</b></td><td>: {s['nama']}</td></tr>
+                        <tr><td><b>Nama Pemohon (Pengaju)</b></td><td>: <b>{s['nama']}</b></td></tr>
                         <tr><td><b>No Anggota</b></td><td>: {s['no_anggota']}</td></tr>
                         <tr><td><b>Nominal Dana</b></td><td>: <b>Rp {s['nominal']:,}</b></td></tr>
                         <tr><td><b>Keperluan</b></td><td>: {s['keperluan']}</td></tr>
@@ -540,8 +539,8 @@ elif role_aktif == "Admin":
         if not data_saat_ini["database"]:
             st.info("Belum ada data pengajuan sama sekali.")
         for idx_all, db_item in enumerate(data_saat_ini["database"]):
-            with st.expander(f"Berkas: {db_item['nama']} — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
-                st.write(f"**Nama Pemohon:** {db_item['nama']} (No: {db_item['no_anggota']})")
+            with st.expander(f"Berkas: **{db_item['nama']}** — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
+                st.write(f"**Nama Pengaju (Pemohon):** **{db_item['nama']}** (No: {db_item['no_anggota']})")
                 st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
                 st.write(f"**Nominal:** Rp {db_item['nominal']:,}")
                 st.write(f"**Keperluan:** {db_item['keperluan']}")

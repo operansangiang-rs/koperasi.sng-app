@@ -6,10 +6,10 @@ import base64
 import io
 import requests
 
-st.set_page_config(page_title="Sistem Pengajuan & Approval Koperasi", layout="centered")
+st.set_page_config(page_title="Sistem Approval Berjenjang Koperasi", layout="centered")
 
 # =========================================================================
-# 🔐 MENGAMBIL DATA REPO & TOKEN AMAN DARI STREAMLIT SECRETS
+# 🔐 GITHUB SECRETS
 # =========================================================================
 try:
     GITHUB_TOKEN = st.secrets["github"]["token"]
@@ -19,292 +19,167 @@ except Exception:
     REPO_NAME = ""
 
 DB_FILE = "data_store.json"
+TEMPLATE_AWAL = {"database": [], "categories": ["Pinjaman Rutin", "Pinjaman Darurat", "Pinjaman Modal Usaha"]}
 
-TEMPLATE_AWAL = {
-    "database": [],
-    "categories": ["Pinjaman Rutin", "Pinjaman Darurat", "Pinjaman Modal Usaha"]
-}
+# --- Fungsi Helper: Konversi Canvas ke Base64 ---
+def canvas_to_base64(canvas_data):
+    if canvas_data is not None:
+        img = Image.fromarray(canvas_data.astype('uint8'), 'RGBA')
+        buffered = io.BytesIO()
+        img.save(buffered, format="PNG")
+        return base64.b64encode(buffered.getvalue()).decode()
+    return None
 
-# Fungsi Membaca Data dari GitHub
+# --- Fungsi API GitHub ---
 def load_data_from_github():
     if GITHUB_TOKEN.startswith("ghp_") and "/" in REPO_NAME:
         url = f"https://api.github.com/repos/{REPO_NAME}/contents/{DB_FILE}"
-        headers = {
-            "Authorization": f"token {GITHUB_TOKEN}",
-            "Accept": "application/vnd.github.v3+json"
-        }
+        headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
         response = requests.get(url, headers=headers)
-        
         if response.status_code == 200:
             file_content = response.json()
             content_decoded = base64.b64decode(file_content["content"]).decode("utf-8")
-            if content_decoded.strip() == "":
-                return TEMPLATE_AWAL, file_content.get("sha", None)
-            try:
-                data = json.loads(content_decoded)
-                if "database" not in data: data["database"] = []
-                if "categories" not in data: data["categories"] = []
-                return data, file_content["sha"]
-            except Exception:
-                return TEMPLATE_AWAL, file_content.get("sha", None)
+            data = json.loads(content_decoded)
+            return data, file_content["sha"]
     return TEMPLATE_AWAL, None
 
-# Fungsi Update/Push Database back to GitHub
-def push_database_to_github(updated_data, sha_lama, commit_message):
+def push_database_to_github(updated_data, sha_lama, message):
     json_string = json.dumps(updated_data, indent=4, ensure_ascii=False)
     content_encoded = base64.b64encode(json_string.encode("utf-8")).decode("utf-8")
-    
     url = f"https://api.github.com/repos/{REPO_NAME}/contents/{DB_FILE}"
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "message": commit_message,
-        "content": content_encoded
-    }
-    if sha_lama:
-        payload["sha"] = sha_lama
-        
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Content-Type": "application/json"}
+    payload = {"message": message, "content": content_encoded, "sha": sha_lama}
     res = requests.put(url, headers=headers, json=payload)
     return res.status_code in [200, 201]
 
-# Load data & SHA di awal
 data_saat_ini, sha_saat_ini = load_data_from_github()
 
 # =========================================================================
-# 🔑 MENU LOGIN DI SIDEBAR (SEBELAH KIRI)
+# 🔑 LOGIN SYSTEM
 # =========================================================================
-st.sidebar.title("🔐 Menu Akses")
-role = st.sidebar.selectbox("Pilih Hak Akses / Role", ["User Biasa", "Kepala Divisi", "Kepala Bidang", "Direktur", "SDM"])
+st.sidebar.title("🔐 Login Pejabat")
+role = st.sidebar.selectbox("Pilih Role", ["User Biasa", "Kepala Divisi", "Kepala Bidang", "Direktur", "SDM"])
 
 login_sukses = False
+if role == "User Biasa": login_sukses = True
+elif role == "Kepala Divisi" and st.sidebar.text_input("Pass", type="password") == "123": login_sukses = True
+elif role == "Kepala Bidang" and st.sidebar.text_input("Pass", type="password") == "1234": login_sukses = True
+elif role == "Direktur" and st.sidebar.text_input("Pass", type="password") == "12345": login_sukses = True
+elif role == "SDM" and st.sidebar.text_input("Pass", type="password") == "123456": login_sukses = True
 
-if role == "User Biasa":
-    login_sukses = True
-elif role == "Kepala Divisi":
-    pwd = st.sidebar.text_input("Password Kepala Divisi", type="password")
-    if pwd == "123": login_sukses = True
-    elif pwd: st.sidebar.error("❌ Password Salah")
-elif role == "Kepala Bidang":
-    pwd = st.sidebar.text_input("Password Kepala Bidang", type="password")
-    if pwd == "1234": login_sukses = True
-    elif pwd: st.sidebar.error("❌ Password Salah")
-elif role == "Direktur":
-    pwd = st.sidebar.text_input("Password Direktur", type="password")
-    if pwd == "12345": login_sukses = True
-    elif pwd: st.sidebar.error("❌ Password Salah")
-elif role == "SDM":
-    pwd = st.sidebar.text_input("Password SDM", type="password")
-    if pwd == "123456": login_sukses = True
-    elif pwd: st.sidebar.error("❌ Password Salah")
-
-
-# =========================================================================
-# HALAMAN UTAMA BERDASARKAN HAK AKSES
-# =========================================================================
 if not login_sukses:
-    st.info("👋 Silakan masukkan password valid di sidebar kiri untuk mengakses sistem.")
+    st.info("Silakan login di sidebar untuk melanjutkan.")
 else:
-    st.title(f"🏛️ Portal Koperasi - Akses: {role}")
-    st.write("---")
+    st.title(f"Akses: {role}")
 
     # ---------------------------------------------------------------------
-    # 📝 MODE 1: USER BIASA (MENGISI FORMULIR)
+    # 📝 USER BIASA (PENGAJU)
     # ---------------------------------------------------------------------
     if role == "User Biasa":
-        st.subheader("📝 Formulir Pengajuan Baru")
-        
-        with st.form("form_pinjaman"):
-            nama = st.text_input("Nama Lengkap Anggota")
-            no_anggota = st.text_input("Nomor Anggota Koperasi")
-            nominal = st.number_input("Nominal Pinjaman (Rp)", min_value=100000, step=50000)
-            keperluan = st.text_area("Alasan/Keperluan Pinjaman")
-            kategori = st.selectbox("Jenis Kategori Pinjaman", data_saat_ini["categories"])
-            
-            st.write("---")
-            st.write("**Pernyataan:** Dengan menandatangani di bawah ini, saya menyatakan data di atas adalah benar.")
-            
-            canvas_result = st_canvas(
-                fill_color="rgba(255, 255, 255, 0)", 
-                stroke_width=3,
-                stroke_color="#000000", 
-                background_color="#ffffff", 
-                height=150,
-                width=350,
-                drawing_mode="freedraw",
-                key="canvas_ttd",
-            )
-            
-            submit_button = st.form_submit_button("Kirim Pengajuan")
-
-        if submit_button:
-            if not nama.strip() or not no_anggota.strip():
-                st.error("❌ Mohon isi Nama dan Nomor Anggota terlebih dahulu!")
-            elif canvas_result.image_data is None:
-                st.error("❌ Tanda tangan wajib diisi!")
-            else:
-                with st.spinner("Sedang memproses dan mengunci data ke sistem..."):
-                    try:
-                        img = Image.fromarray(canvas_result.image_data.astype('uint8'), 'RGBA')
-                        buffered = io.BytesIO()
-                        img.save(buffered, format="PNG")
-                        img_str = base64.b64encode(buffered.getvalue()).decode()
-                        
-                        data_baru = {
-                            "nama": nama.strip(),
-                            "no_anggota": no_anggota.strip(),
-                            "nominal": nominal,
-                            "keperluan": keperluan.strip(),
-                            "kategori": kategori,
-                            "tanda_tangan_base64": img_str,
-                            "status": "Menunggu Persetujuan Kepala Divisi"
-                        }
-                        
-                        data_saat_ini["database"].append(data_baru)
-                        
-                        sukses = push_database_to_github(data_saat_ini, sha_saat_ini, f"Pengajuan baru: {nama.strip()}")
-                        if sukses:
-                            st.success("✅ Sukses! Pengajuan berhasil dikirim.")
-                            st.rerun()
-                        else:
-                            st.error("Gagal menyimpan ke database GitHub.")
-                    except Exception as e:
-                        st.error(f"Terjadi kesalahan sistem: {e}")
+        with st.form("form_pengajuan"):
+            nama = st.text_input("Nama Lengkap")
+            no_anggota = st.text_input("No Anggota")
+            nominal = st.number_input("Nominal", min_value=0)
+            keperluan = st.text_area("Keperluan")
+            st.write("Tanda Tangan Pengaju:")
+            cv_user = st_canvas(stroke_width=3, height=150, width=300, key="cv_user")
+            if st.form_submit_button("Kirim Pengajuan"):
+                ttd_user = canvas_to_base64(cv_user.image_data)
+                if nama and ttd_user:
+                    new_data = {
+                        "nama": nama, "no_anggota": no_anggota, "nominal": nominal, "keperluan": keperluan,
+                        "ttd_pengaju": ttd_user, "status": "Menunggu Divisi"
+                    }
+                    data_saat_ini["database"].append(new_data)
+                    push_database_to_github(data_saat_ini, sha_saat_ini, f"Baru: {nama}")
+                    st.success("Terkirim!"); st.rerun()
 
     # ---------------------------------------------------------------------
-    # ✅ MODE 2: KEPALA DIVISI (VERIFIKASI TAHAP 1)
+    # ✅ KEPALA DIVISI
     # ---------------------------------------------------------------------
     elif role == "Kepala Divisi":
-        st.subheader("☑️ Daftar Pengajuan Masuk (Verifikasi Kepala Divisi)")
-        
-        # PENGAMAN: Menggunakan .get("status") agar data lama tidak bikin crash
-        pengajuan_divisi = [item for item in data_saat_ini["database"] if item.get("status", "Menunggu Persetujuan Kepala Divisi") == "Menunggu Persetujuan Kepala Divisi"]
-        
-        if not pengajuan_divisi:
-            st.info("Belum ada pengajuan yang memerlukan verifikasi Kepala Divisi.")
-        else:
-            for idx, item in enumerate(pengajuan_divisi):
-                with st.expander(f"Pengajuan: {item['nama']} - Rp {item['nominal']:,}"):
-                    st.write(f"**Nomor Anggota:** {item['no_anggota']}")
-                    st.write(f"**Kategori:** {item['kategori']}")
-                    st.write(f"**Keperluan:** {item['keperluan']}")
-                    
-                    st.write("**Tanda Tangan Pengaju:**")
-                    try:
-                        img_bytes = base64.b64decode(item["tanda_tangan_base64"])
-                        img = Image.open(io.BytesIO(img_bytes))
-                        st.image(img, width=250)
-                    except Exception:
-                        st.text("Gagal memuat gambar tanda tangan.")
-                        
-                    if st.button("Setujui Pengajuan Ini", key=f"app1_{idx}"):
-                        for original_item in data_saat_ini["database"]:
-                            if original_item["no_anggota"] == item["no_anggota"] and original_item.get("status", "Menunggu Persetujuan Kepala Divisi") == "Menunggu Persetujuan Kepala Divisi":
-                                original_item["status"] = "Menunggu Persetujuan Kepala Bidang"
-                                break
-                        
-                        if push_database_to_github(data_saat_ini, sha_saat_ini, f"Disetujui Kadiv: {item['nama']}"):
-                            st.success("✅ Berhasil disetujui! Status dialihkan ke Kepala Bidang.")
-                            st.rerun()
+        items = [i for i in data_saat_ini["database"] if i.get("status") == "Menunggu Divisi"]
+        if not items: st.info("Tidak ada data.")
+        for idx, item in enumerate(items):
+            with st.expander(f"Pengajuan {item['nama']}"):
+                st.write(f"Nominal: Rp {item['nominal']:,}")
+                st.write(f"Keperluan: {item['keperluan']}")
+                st.write("---")
+                st.write("Tanda Tangan Kepala Divisi di Sini:")
+                cv_div = st_canvas(stroke_width=3, height=150, width=300, key=f"cv_div_{idx}")
+                if st.button("Setujui & Tanda Tangan", key=f"btn_div_{idx}"):
+                    ttd_div = canvas_to_base64(cv_div.image_data)
+                    if ttd_div:
+                        for d in data_saat_ini["database"]:
+                            if d["no_anggota"] == item["no_anggota"] and d["status"] == "Menunggu Divisi":
+                                d["status"] = "Menunggu Bidang"; d["ttd_kadiv"] = ttd_div
+                        push_database_to_github(data_saat_ini, sha_saat_ini, "Setuju Kadiv")
+                        st.rerun()
 
     # ---------------------------------------------------------------------
-    # ✅ MODE 3: KEPALA BIDANG (VERIFIKASI TAHAP 2)
+    # ✅ KEPALA BIDANG
     # ---------------------------------------------------------------------
     elif role == "Kepala Bidang":
-        st.subheader("☑️ Daftar Verifikasi Kepala Bidang")
-        
-        pengajuan_kabid = [item for item in data_saat_ini["database"] if item.get("status") == "Menunggu Persetujuan Kepala Bidang"]
-        
-        if not pengajuan_kabid:
-            st.info("Tidak ada data yang menunggu verifikasi Kepala Bidang.")
-        else:
-            for idx, item in enumerate(pengajuan_kabid):
-                with st.expander(f"Pengajuan: {item['nama']} - Rp {item['nominal']:,}"):
-                    st.write(f"**Nomor Anggota:** {item['no_anggota']}")
-                    st.write(f"**Kategori:** {item['kategori']}")
-                    st.write(f"**Keperluan:** {item['keperluan']}")
-                    
-                    if st.button("Setujui Pengajuan Ini (Kabid)", key=f"app2_{idx}"):
-                        for original_item in data_saat_ini["database"]:
-                            if original_item["no_anggota"] == item["no_anggota"] and original_item.get("status") == "Menunggu Persetujuan Kepala Bidang":
-                                original_item["status"] = "Menunggu Persetujuan Direktur"
-                                break
-                                
-                        if push_database_to_github(data_saat_ini, sha_saat_ini, f"Disetujui Kabid: {item['nama']}"):
-                            st.success("✅ Berhasil disetujui Kabid! Status dialihkan ke Direktur.")
-                            st.rerun()
+        items = [i for i in data_saat_ini["database"] if i.get("status") == "Menunggu Bidang"]
+        for idx, item in enumerate(items):
+            with st.expander(f"Dari: {item['nama']}"):
+                st.write(f"Nominal: Rp {item['nominal']:,}")
+                st.write("Silakan Tanda Tangan Kepala Bidang:")
+                cv_bid = st_canvas(stroke_width=3, height=150, width=300, key=f"cv_bid_{idx}")
+                if st.button("Verifikasi Kepala Bidang", key=f"btn_bid_{idx}"):
+                    ttd_bid = canvas_to_base64(cv_bid.image_data)
+                    if ttd_bid:
+                        for d in data_saat_ini["database"]:
+                            if d["no_anggota"] == item["no_anggota"] and d["status"] == "Menunggu Bidang":
+                                d["status"] = "Menunggu Direktur"; d["ttd_kabid"] = ttd_bid
+                        push_database_to_github(data_saat_ini, sha_saat_ini, "Setuju Kabid")
+                        st.rerun()
 
     # ---------------------------------------------------------------------
-    # ✅ MODE 4: DIREKTUR (VERIFIKASI TAHAP 3)
+    # ✅ DIREKTUR
     # ---------------------------------------------------------------------
     elif role == "Direktur":
-        st.subheader("☑️ Daftar Verifikasi Direktur")
-        
-        pengajuan_dir = [item for item in data_saat_ini["database"] if item.get("status") == "Menunggu Persetujuan Direktur"]
-        
-        if not pengajuan_dir:
-            st.info("Tidak ada data yang menunggu verifikasi Direktur.")
-        else:
-            for idx, item in enumerate(pengajuan_dir):
-                with st.expander(f"Pengajuan: {item['nama']} - Rp {item['nominal']:,}"):
-                    st.write(f"**Nomor Anggota:** {item['no_anggota']}")
-                    st.write(f"**Kategori:** {item['kategori']}")
-                    st.write(f"**Keperluan:** {item['keperluan']}")
-                    
-                    if st.button("Setujui Pengajuan Ini (Direktur)", key=f"app3_{idx}"):
-                        for original_item in data_saat_ini["database"]:
-                            if original_item["no_anggota"] == item["no_anggota"] and original_item.get("status") == "Menunggu Persetujuan Direktur":
-                                original_item["status"] = "Menunggu ACC SDM"
-                                break
-                                
-                        if push_database_to_github(data_saat_ini, sha_saat_ini, f"Disetujui Direktur: {item['nama']}"):
-                            st.success("✅ Berhasil disetujui Direktur! Status dialihkan ke ACC SDM.")
-                            st.rerun()
+        items = [i for i in data_saat_ini["database"] if i.get("status") == "Menunggu Direktur"]
+        for idx, item in enumerate(items):
+            with st.expander(f"Persetujuan Direktur: {item['nama']}"):
+                st.write(f"Nominal: Rp {item['nominal']:,}")
+                st.write("Tanda Tangan Direktur:")
+                cv_dir = st_canvas(stroke_width=3, height=150, width=300, key=f"cv_dir_{idx}")
+                if st.button("Setujui (Direktur)", key=f"btn_dir_{idx}"):
+                    ttd_dir = canvas_to_base64(cv_dir.image_data)
+                    if ttd_dir:
+                        for d in data_saat_ini["database"]:
+                            if d["no_anggota"] == item["no_anggota"] and d["status"] == "Menunggu Direktur":
+                                d["status"] = "Menunggu SDM"; d["ttd_direktur"] = ttd_dir
+                        push_database_to_github(data_saat_ini, sha_saat_ini, "Setuju Direktur")
+                        st.rerun()
 
     # ---------------------------------------------------------------------
-    # ✅ MODE 5: SDM (FINALISASI ACC & CETAK PDF)
+    # ✅ SDM (FINAL ACC & CETAK)
     # ---------------------------------------------------------------------
     elif role == "SDM":
-        st.subheader("🏁 Finalisasi ACC & Cetak PDF (SDM)")
-        
-        pengajuan_sdm = [item for item in data_saat_ini["database"] if item.get("status") == "Menunggu ACC SDM"]
-        
-        if not pengajuan_sdm:
-            st.info("Tidak ada pengajuan yang siap di-ACC.")
-        else:
-            for idx, item in enumerate(pengajuan_sdm):
-                with st.expander(f"Pengajuan: {item['nama']} - Rp {item['nominal']:,}"):
-                    st.write(f"**Nomor Anggota:** {item['no_anggota']}")
-                    st.write(f"**Kategori:** {item['kategori']}")
-                    st.write(f"**Keperluan:** {item['keperluan']}")
-                    
-                    st.write("**Tanda Tangan Pengaju:**")
-                    try:
-                        img_bytes = base64.b64decode(item["tanda_tangan_base64"])
-                        img = Image.open(io.BytesIO(img_bytes))
-                        st.image(img, width=250)
-                    except Exception:
-                        pass
-                        
-                    if st.button("ACC Akhir & Selesai", key=f"acc_{idx}"):
-                        for original_item in data_saat_ini["database"]:
-                            if original_item["no_anggota"] == item["no_anggota"] and original_item.get("status") == "Menunggu ACC SDM":
-                                original_item["status"] = "Sudah Di-ACC SDM"
-                                break
-                                
-                        if push_database_to_github(data_saat_ini, sha_saat_ini, f"Di-ACC SDM: {item['nama']}"):
-                            st.success("✅ Dokumen telah di-ACC sepenuhnya!")
-                            st.rerun()
-                            
-                    st.write("---")
-                    st.markdown("### 🖨️ Cetak Formulir")
-                    pdf_data = f"Nama: {item['nama']}\nNominal: {item['nominal']}\nKeperluan: {item['keperluan']}\nStatus: ACC SEPENUHNYA OLEH SDM"
-                    st.download_button(
-                        label="📄 Download/Cetak Dokumen (TXT/PDF)",
-                        data=pdf_data,
-                        file_name=f"Form_Koperasi_{item['nama']}.txt",
-                        mime="text/plain"
-                    )
+        items = [i for i in data_saat_ini["database"] if i.get("status") == "Menunggu SDM"]
+        for idx, item in enumerate(items):
+            with st.expander(f"Final ACC: {item['nama']}"):
+                st.write(f"Nama: {item['nama']} | Nominal: Rp {item['nominal']:,}")
+                st.write(f"Keperluan: {item['keperluan']}")
+                
+                # SDM Bisa Lihat TTD Pengaju untuk verifikasi terakhir
+                st.write("TTD Pengaju (Anggota):")
+                st.image(base64.b64decode(item["ttd_pengaju"]), width=200)
+
+                if st.button("ACC FINAL (SDM)", key=f"btn_sdm_{idx}"):
+                    for d in data_saat_ini["database"]:
+                        if d["no_anggota"] == item["no_anggota"] and d["status"] == "Menunggu SDM":
+                            d["status"] = "SELESAI"
+                    push_database_to_github(data_saat_ini, sha_saat_ini, "Final SDM")
+                    st.success("Proses Selesai!"); st.rerun()
+
+        st.write("---")
+        st.subheader("🖨️ Riwayat Selesai (Siap Cetak)")
+        selesai = [i for i in data_saat_ini["database"] if i.get("status") == "SELESAI"]
+        for s in selesai:
+            st.write(f"✅ {s['nama']} - Rp {s['nominal']:,}")
+            # Cetak PDF Text sederhana
+            txt_report = f"FORMULIR PINJAMAN\nNama: {s['nama']}\nNominal: {s['nominal']}\nStatus: TERVERIFIKASI SEMUA PIHAK"
+            st.download_button(f"Unduh Form {s['nama']}", txt_report, file_name=f"{s['nama']}.txt")

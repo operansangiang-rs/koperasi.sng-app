@@ -157,6 +157,13 @@
             "password": "123",
             "status_akun": "Aktif",
             "password_baru": ""
+        },
+        {
+            "username": "cucu",
+            "role": "Kabid",
+            "password": "123",
+            "status_akun": "Aktif",
+            "password_baru": ""
         }
     ],
     "daftar_lantai": [

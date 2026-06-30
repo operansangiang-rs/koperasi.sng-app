@@ -1,7 +1,6 @@
 import streamlit as st
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image
-import pandas as pd
 import json
 import os
 import base64
@@ -24,7 +23,6 @@ TEMPLATE_AWAL = {
 
 # Fungsi Membaca Data & Otomatis Bikin File Jika Belum Ada
 def load_data():
-    # Jika file belum ada di folder, langsung buatkan biar tidak kosong
     if not os.path.exists(DATASTORE_FILE) or os.stat(DATASTORE_FILE).st_size == 0:
         with open(DATASTORE_FILE, "w", encoding="utf-8") as f:
             json.dump(TEMPLATE_AWAL, f, indent=4, ensure_ascii=False)
@@ -33,7 +31,6 @@ def load_data():
     try:
         with open(DATASTORE_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-            # Proteksi agar struktur key tidak hilang
             if "database" not in data: data["database"] = []
             if "categories" not in data: data["categories"] = []
             return data
@@ -62,11 +59,11 @@ def save_data(nama, no_anggota, nominal, keperluan, kategori, ttd_base64):
     with open(DATASTORE_FILE, "w", encoding="utf-8") as f:
         json.dump(data_lama, f, indent=4, ensure_ascii=False)
 
-# Pancing fungsi load_data di awal agar file otomatis tercipta di folder laptop Mas Lian
+# Pancing fungsi load_data di awal agar file otomatis tercipta di folder
 data_saat_ini = load_data()
 
 st.title("🏛️ Pengajuan Pinjaman Koperasi")
-st.write("Isi formulir di bawah. Data otomatis tersimpan langsung ke dalam file **data_store.json**.")
+st.write("Silakan isi formulir di bawah ini dengan lengkap dan benar.")
 
 # 1. FORMULIR INPUT DATA ANGGOTA KOPERASI
 with st.form("form_pinjaman"):
@@ -115,24 +112,8 @@ if submit_button:
             # Eksekusi simpan data ke struktur JSON yang rapi
             save_data(nama.strip(), no_anggota.strip(), nominal, keperluan.strip(), kategori_final.strip(), img_str)
             
-            st.success("✅ Sukses! Data pendaftaran berhasil dikunci ke data_store.json!")
+            st.success("✅ Sukses! Data pendaftaran Anda berhasil dikirim.")
             st.rerun()
             
         except Exception as e:
             st.error(f"Terjadi kesalahan sistem: {e}")
-
-# 3. MONITOR PREVIEW JADI JSON NYA DI BAWAH WEB
-st.write("---")
-st.subheader("📂 Tampilan Isi File `data_store.json` Saat Ini:")
-
-# Tampilkan langsung isi JSON-nya (sekarang dijamin langsung muncul strukturnya, tidak kosongan)
-json_string = json.dumps(data_saat_ini, indent=4, ensure_ascii=False)
-st.code(json_string, language="json")
-
-# Tombol download file JSON langsung dari browser web
-st.download_button(
-    label="📥 Download data_store.json",
-    data=json_string,
-    file_name="data_store.json",
-    mime="application/json"
-)

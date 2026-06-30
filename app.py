@@ -216,7 +216,7 @@ if role_aktif == "User Biasa":
                     "nama": nama.strip(), "no_anggota": no_anggota.strip(), 
                     "lantai_asal": lantai_asal, "unit": unit,
                     "nama_pejabat": nama_pejabat.strip(), 
-                    "nama_istri_saudara": nama_istri_saudara.strip(), # Tersimpan dinamis
+                    "nama_istri_saudara": nama_istri_saudara.strip(),
                     "nominal": nominal, "keperluan": keperluan.strip(),
                     "ttd_pengaju": ttd_user, "ttd_keluarga": ttd_keluarga,
                     "status": "Menunggu Verifikasi Kepala Divisi", 
@@ -242,12 +242,13 @@ if role_aktif == "User Biasa":
                     time.sleep(1.2); st.rerun()
 
 # ---------------------------------------------------------------------
-# ✅ KEPALA DIVISI (OTORISASI LOGIN BERDASARKAN LANTAI YANG DIPILIH)
+# ✅ KEPALA DIVISI (NAMA PEJABAT MUNCUL OTOMATIS BERDASARKAN INPUT PENGAJU)
 # ---------------------------------------------------------------------
 elif role_aktif == "Kepala Divisi":
     st.subheader(f"👋 Selamat Datang Pejabat Area: {lantai_aktif}")
     st.info("Anda berwenang meng-ACC berkas pengajuan yang masuk untuk lantai Anda.")
     
+    # Filter ketat hanya memunculkan data pengajuan dari lantai yang login saat ini
     items = [
         i for i in data_saat_ini["database"] 
         if i.get("status") == "Menunggu Verifikasi Kepala Divisi" and i.get("lantai_asal") == lantai_aktif
@@ -257,8 +258,11 @@ elif role_aktif == "Kepala Divisi":
         st.info(f"Bersih! Belum ada antrean berkas pinjaman untuk area {lantai_aktif}.")
         
     for idx, item in enumerate(items):
-        st.markdown(f"### 📋 Berkas: {item['nama']} — Unit: {item.get('unit')}")
-        st.write(f"**Diajukan ke (Nama Pejabat):** *{item.get('nama_pejabat', '-')}*")
+        # Otomatis mencetak / menyematkan nama pejabat yang bertugas di atas kartu
+        st.markdown("### 📋 Berkas Pengajuan Masuk")
+        st.success(f"Berkas Ini Ditujukan Kepada Anda: **{item.get('nama_pejabat', '-')}** ({lantai_aktif})")
+        
+        st.write(f"**Nama Pemohon:** {item['nama']} | **Unit:** {item.get('unit')}")
         st.write(f"**Penjamin (Istri/Saudara):** **{item.get('nama_istri_saudara', '-')}**")
         st.write(f"**Nominal:** Rp {item['nominal']:,} | **Keperluan:** {item['keperluan']}")
         
@@ -270,7 +274,7 @@ elif role_aktif == "Kepala Divisi":
             st.caption(f"Tanda Tangan Penjamin ({item.get('nama_istri_saudara', 'Istri/Saudara')}):")
             st.image(base64.b64decode(item["ttd_keluarga"]), width=120)
             
-        st.write(f"**Tanda Tangan ACC Kepala Divisi ({lantai_aktif}):**")
+        st.write(f"**Tanda Tangan ACC Kepala Divisi — {item.get('nama_pejabat', '-')} :**")
         cv_div = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=110, width=220, key=f"cv_div_{idx}")
         
         if st.button("✍️ Setujui & Teruskan Berkas", key=f"btn_div_{idx}"):
@@ -305,6 +309,7 @@ elif role_aktif == "SDM":
         for idx, item in enumerate(items_sdm):
             st.markdown(f"### Berkas: {item['nama']} — Status Saat Ini: **{item['status']}**")
             st.write(f"**Lantai/Unit:** {item.get('lantai_asal')} ({item.get('unit')}) | **Rp {item['nominal']:,}**")
+            st.caption(f"Ditujukan ke Pejabat: *{item.get('nama_pejabat', '-')}*")
             
             if st.button(f"🔒 Setujui / Nyatakan SELESAI ({item['nama']})", key=f"force_acc_{idx}"):
                 for d in data_saat_ini["database"]:
@@ -324,7 +329,7 @@ elif role_aktif == "SDM":
             col1, col2 = st.columns([4, 2])
             with col1: 
                 st.write(f"✅ **{s['nama']}** — {s.get('lantai_asal')} — Rp {s['nominal']:,}")
-                st.caption(f"Verifikator: {s.get('nama_pejabat', '-')} | Penjamin: <b>{s.get('nama_istri_saudara', '-')}</b>", unsafe_allow_html=True)
+                st.caption(f"Verifikator: <b>{s.get('nama_pejabat', '-')}</b> | Penjamin: <b>{s.get('nama_istri_saudara', '-')}</b>", unsafe_allow_html=True)
             with col2:
                 if st.button("🖨️ Buka Printer PDF", key=f"print_btn_{idx}"): st.session_state.print_id = s['no_anggota']
             

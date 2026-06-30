@@ -217,7 +217,6 @@ else:
     # ✅ SDM (FINAL ACC & PRINT PDF LENGKAP DENGAN TTD)
     # ---------------------------------------------------------------------
     elif role == "SDM":
-        # Inisialisasi state untuk dokumen yang sedang dicetak
         if "print_id" not in st.session_state:
             st.session_state.print_id = None
 
@@ -257,8 +256,14 @@ else:
                     st.session_state.print_id = s['no_anggota']
                     st.toast(f"🖨️ Membuka jendela cetak untuk {s['nama']}...", icon="📄")
 
-            # Blok Kode Render Template Print jika tombol diklik
+            # REVISI DI SINI: Jika print_id sesuai, munculkan tombol batal & pratinjau
             if st.session_state.print_id == s['no_anggota']:
+                st.write("---")
+                # Tombol Batal untuk menutup pratinjau sepenuhnya
+                if st.button("❌ Tutup / Batal Cetak", key=f"close_btn_{idx}"):
+                    st.session_state.print_id = None
+                    st.rerun()
+                
                 st.info(f"Tekan tombol printer bawaan laptop/HP Anda untuk menyimpannya sebagai **Save as PDF**.")
                 
                 # Desain Berkas Nota/Formulir HTML Resmi Koperasi Khusus Cetak
@@ -315,7 +320,6 @@ else:
                         document.body.innerHTML = printContents;
                         window.print();
                         document.body.innerHTML = originalContents;
-                        window.location.reload();
                     }}, 1000);
                 </script>
                 """

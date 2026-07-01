@@ -527,63 +527,56 @@ elif role_aktif == "Direktur":
             st.write(f"**Penjamin:** {db_item.get('nama_istri_saudara', '-')}")
 
 # ---------------------------------------------------------------------
-# ✅ SDM
+# ✅ SDM (MANAJEMEN DATA PORTAL) - REVISI
 # ---------------------------------------------------------------------
 elif role_aktif == "SDM":
     st.subheader("👋 Halaman SDM (Manajemen Data Portal)")
     st.info("Anda dapat memantau seluruh rekapitulasi pengajuan dan mengelola akun akses.")
     
-    tab_sdm1, tab_sdm2, tab_sdm3 = st.tabs(["📋 Rekap Berkas Selesai", "👁️ Transparansi Semua Berkas", "👥 Manajemen Akun Akses"])
+    # Menambahkan tab baru khusus untuk Log Keputusan
+    tab_sdm1, tab_sdm2, tab_sdm3, tab_sdm4 = st.tabs(["📋 Arsip Selesai", "👁️ Transparansi", "📊 Log Keputusan", "👥 Akun"])
     
     with tab_sdm1:
         st.subheader("📑 Arsip Berkas Selesai (ACC Lengkap)")
         selesais_sdm = [i for i in data_saat_ini["database"] if i.get("status") == "SELESAI"]
         
-        if not selesais_sdm: 
-            st.info("Belum ada arsip data yang berstatus selesai.")
-            
-        if "print_id_sdm" not in st.session_state: 
-            st.session_state.print_id_sdm = None
+        if not selesais_sdm: st.info("Belum ada arsip data yang berstatus selesai.")
+        
+        if "print_id_sdm" not in st.session_state: st.session_state.print_id_sdm = None
             
         for idx_s, s_item in enumerate(selesais_sdm):
             col_s1, col_s2, col_s3 = st.columns([3, 1.5, 1.5])
-            with col_s1: 
-                st.write(f"✅ Pengaju: **{s_item['nama']}** — Rp {s_item['nominal']:,}")
+            with col_s1: st.write(f"✅ Pengaju: **{s_item['nama']}** — Rp {s_item['nominal']:,}")
             with col_s2:
-                if st.button("🖨️ Buka Printer PDF", key=f"print_sdm_{idx_s}"): 
-                    st.session_state.print_id_sdm = s_item['no_anggota']
+                if st.button("🖨️ Cetak PDF", key=f"print_sdm_{idx_s}"): st.session_state.print_id_sdm = s_item['no_anggota']
             with col_s3:
-                if st.button("🗑️ Hapus Berkas", key=f"del_sdm_{idx_s}"):
-                    data_saat_ini["database"] = [d for d in data_saat_ini["database"] if d["no_anggota"] != s_item["no_anggota"]]
-                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"SDM Hapus Arsip: {s_item['nama']}"):
-                        st.toast(f"Arsip {s_item['nama']} berhasil dihapus permanen.")
-                        time.sleep(1.2); st.rerun()
+                if st.button("🗑️ Hapus", key=f"del_sdm_selesai_{idx_s}"):
+                    if hapus_berkas(s_item['no_anggota']): st.toast("Arsip dihapus."); st.rerun()
             
             if st.session_state.print_id_sdm == s_item['no_anggota']:
-                if st.button("❌ Tutup Jendela Cetak", key=f"close_print_sdm_{idx_s}"):
-                    st.session_state.print_id_sdm = None
-                    st.rerun()
+                if st.button("❌ Tutup Jendela Cetak", key=f"close_print_sdm_{idx_s}"): st.session_state.print_id_sdm = None; st.rerun()
                 html_isi = render_cetak_pdf_html(s_item)
                 st.components.v1.html(html_isi, height=450, scrolling=True)
             st.write("---")
             
     with tab_sdm2:
-        st.subheader("👁️ Transparansi: Pemantauan Seluruh Pengajuan Berjalan")
-        if not data_saat_ini["database"]:
-            st.info("Belum ada data pengajuan sama sekali.")
+        st.subheader("👁️ Transparansi: Semua Berkas Berjalan")
         for idx_all, db_item in enumerate(data_saat_ini["database"]):
-            with st.expander(f"Berkas: **{db_item['nama']}** — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
-                st.write(f"**Nama Pengaju (Pemohon):** **{db_item['nama']}** (No: {db_item['no_anggota']})")
+            with st.expander(f"Berkas: {db_item['nama']} — Status: {db_item['status']}"):
                 st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
                 st.write(f"**Nominal:** Rp {db_item['nominal']:,}")
-                st.write(f"**Keperluan:** {db_item['keperluan']}")
-                st.write(f"**Penjamin:** {db_item.get('nama_istri_saudara', '-')}")
+                # Tambahan tombol hapus di transparansi jika berkas macet
+                if st.button(f"🗑️ Hapus Berkas {db_item['no_anggota']}", key=f"del_all_{idx_all}"):
+                    if hapus_berkas(db_item['no_anggota']): st.toast("Berkas dihapus."); st.rerun()
 
     with tab_sdm3:
-        st.warning("⚠️ *Manajemen penambahan/pengurangan akun login diarahkan melalui login Super Admin (Admin Portal).*")
+        # Menampilkan Log keputusan yang sudah kita buat di Langkah 1
+        render_log_keputusan(data_saat_ini)
+
+    with tab_sdm4:
+        st.warning("⚠️ *Manajemen akun diarahkan melalui login Super Admin.*")
         for u_item in data_saat_ini["users"]:
             st.write(f"• Username: **{u_item['username']}** | Role: *{u_item['role']}*")
-
 # ---------------------------------------------------------------------
 # ✅ SUPER ADMIN (ADMIN PORTAL: AKSES SEGALA MENU DAN PENGATURAN)
 # ---------------------------------------------------------------------

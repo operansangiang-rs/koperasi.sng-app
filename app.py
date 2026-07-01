@@ -81,20 +81,20 @@ def push_database_to_github(updated_data, sha_lama, message):
     res = requests.put(url, headers=headers, json=payload)
     return res.status_code in [200, 201]
 
-def update_status_berkas(no_anggota_target, status_baru, alasan=""):
+def update_status_berkas(NIK_target, status_baru, alasan=""):
     global data_saat_ini
     for d in data_saat_ini["database"]:
-        if str(d["no_anggota"]).strip() == str(no_anggota_target).strip():
+        if str(d["NIK"]).strip() == str(NIK_target).strip():
             d["status"] = status_baru
             d["alasan_penolakan"] = alasan
             break
     return push_database_to_github(data_saat_ini, sha_saat_ini, f"Update status ke {status_baru}")
 
 # FUNGSI INI YANG TADI MENGAKIBATKAN ERROR KARENA BELUM ADA
-def hapus_berkas(no_anggota_target):
+def hapus_berkas(NIK_target):
     global data_saat_ini
-    data_saat_ini["database"] = [d for d in data_saat_ini["database"] if str(d["no_anggota"]).strip() != str(no_anggota_target).strip()]
-    return push_database_to_github(data_saat_ini, sha_saat_ini, f"Hapus berkas: {no_anggota_target}")
+    data_saat_ini["database"] = [d for d in data_saat_ini["database"] if str(d["NIK"]).strip() != str(NIK_target).strip()]
+    return push_database_to_github(data_saat_ini, sha_saat_ini, f"Hapus berkas: {NIK_target}")
 
 def render_log_keputusan(data):
     st.subheader("📊 Log Keputusan Akhir")
@@ -120,7 +120,7 @@ def render_cetak_pdf_html(s):
         </div>
         <table style="width:100%; font-size:13px; margin-bottom:20px;">
             <tr><td><b>Nama Pemohon (Pengaju)</b></td><td>: <b>{s['nama']}</b></td></tr>
-            <tr><td><b>No Anggota</b></td><td>: {s['no_anggota']}</td></tr>
+            <tr><td><b>No Anggota</b></td><td>: {s['NIK']}</td></tr>
             <tr><td><b>Nominal Dana</b></td><td>: <b>Rp {s['nominal']:,}</b></td></tr>
             <tr><td><b>Keperluan</b></td><td>: {s['keperluan']}</td></tr>
             <tr><td><b>Karu Tujuan (ACC)</b></td><td>: {s.get('target_karu', '-')}</td></tr>
@@ -273,7 +273,7 @@ if role_aktif == "User Biasa":
     st.subheader("📝 Formulir Pengajuan Berkas Pinjaman")
     with st.form("form_pengajuan"):
         nama = st.text_input("Nama Lengkap Anggota Pemohon")
-        no_anggota = st.text_input("No Anggota")
+        NIK = st.text_input("No Anggota")
             
         st.markdown("---")
         st.write("<b>👤 Pilih Supervisor / Karu (Kepala Regu) Tujuan:</b>", unsafe_allow_html=True)
@@ -304,7 +304,7 @@ if role_aktif == "User Biasa":
             ttd_user = canvas_to_base64(cv_user.image_data)
             ttd_keluarga = canvas_to_base64(cv_keluarga.image_data)
             
-            if not nama.strip() or not no_anggota.strip():
+            if not nama.strip() or not NIK.strip():
                 st.error("❌ Nama dan Nomor Anggota wajib diisi!")
             elif not target_karu:
                 st.error("❌ Target Karu (Kepala Regu) belum ditentukan!")
@@ -314,7 +314,7 @@ if role_aktif == "User Biasa":
                 st.error("❌ Tanda tangan Pemohon & Keluarga wajib dilengkapi!")
             else:
                 st.session_state.preview_data = {
-                    "nama": nama.strip(), "no_anggota": no_anggota.strip(), 
+                    "nama": nama.strip(), "NIK": NIK.strip(), 
                     "target_karu": target_karu,
                     "nama_istri_saudara": nama_istri_saudara.strip(),
                     "nominal": nominal, "keperluan": keperluan.strip(),
@@ -326,7 +326,7 @@ if role_aktif == "User Biasa":
     if st.session_state.preview_data is not None:
         p = st.session_state.preview_data
         st.warning("⚠️ **Konfirmasi Pratinjau Berkas Sebelum Dikirim**")
-        st.info(f"**Pemohon:** {p['nama']} (No Anggota: {p['no_anggota']})\n\n**Tujuan Karu:** *{p['target_karu']}* | **Penjamin:** *{p['nama_istri_saudara']}* \n\n**Nominal:** Rp {p['nominal']:,}")
+        st.info(f"**Pemohon:** {p['nama']} (No Anggota: {p['NIK']})\n\n**Tujuan Karu:** *{p['target_karu']}* | **Penjamin:** *{p['nama_istri_saudara']}* \n\n**Nominal:** Rp {p['nominal']:,}")
         
         c1, c2 = st.columns(2)
         with c1:
@@ -360,7 +360,7 @@ elif role_aktif == "Karu":
         st.markdown("### 📋 Berkas Pengajuan Perlu Diproses")
         st.success(f"Ditujukan Kepada Anda (Karu): **{item.get('target_karu')}**")
         
-        st.write(f"**Nama Pemohon:** **{item['nama']}** (No: {item['no_anggota']})")
+        st.write(f"**Nama Pemohon:** **{item['nama']}** (No: {item['NIK']})")
         st.write(f"**Penjamin:** **{item.get('nama_istri_saudara', '-')}**")
         st.write(f"**Nominal:** Rp {item['nominal']:,} | **Keperluan:** {item['keperluan']}")
         
@@ -384,7 +384,7 @@ elif role_aktif == "Karu":
                     st.error("❌ Tanda tangan wajib diisi!")
                 else:
                     for d in data_saat_ini["database"]:
-                        if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Verifikasi Karu":
+                        if str(d["NIK"]).strip() == str(item["NIK"]).strip() and d.get("status") == "Menunggu Verifikasi Karu":
                             d["status"] = "Menunggu Bidang"
                             d["ttd_kadiv"] = ttd_div
                             break
@@ -398,7 +398,7 @@ elif role_aktif == "Karu":
                 if st.button("Kirim Penolakan", key=f"tolak_karu_{idx}"):
                     if not alasan_tolak:
                         st.warning("Mohon isi alasan penolakan!")
-                    elif update_status_berkas(item['no_anggota'], "DITOLAK", alasan_tolak):
+                    elif update_status_berkas(item['NIK'], "DITOLAK", alasan_tolak):
                         st.error("Pengajuan ditolak.")
                         time.sleep(1.2); st.rerun()
         
@@ -411,7 +411,7 @@ elif role_aktif == "Karu":
         st.info("Belum ada data pengajuan sama sekali.")
     for idx_all, db_item in enumerate(data_saat_ini["database"]):
         with st.expander(f"Berkas: **{db_item['nama']}** — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
-            st.write(f"**Nama Pengaju (Pemohon):** **{db_item['nama']}** (No: {db_item['no_anggota']})")
+            st.write(f"**Nama Pengaju (Pemohon):** **{db_item['nama']}** (No: {db_item['NIK']})")
             st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
             st.write(f"**Nominal:** Rp {db_item['nominal']:,}")
             st.write(f"**Keperluan:** {db_item['keperluan']}")
@@ -445,7 +445,7 @@ elif role_aktif == "Kabid":
                     st.error("❌ Tanda tangan wajib diisi sebelum verifikasi!")
                 else:
                     for d in data_saat_ini["database"]:
-                        if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Bidang":
+                        if str(d["NIK"]).strip() == str(item["NIK"]).strip() and d.get("status") == "Menunggu Bidang":
                             d["status"] = "Menunggu Direktur"
                             d["ttd_kabid"] = ttd_kabid
                             break
@@ -458,7 +458,7 @@ elif role_aktif == "Kabid":
                 if st.button("Kirim Penolakan", key=f"tolak_kabid_{idx}"):
                     if not alasan_tolak:
                         st.warning("Mohon isi alasan penolakan!")
-                    elif update_status_berkas(item['no_anggota'], "DITOLAK", alasan_tolak):
+                    elif update_status_berkas(item['NIK'], "DITOLAK", alasan_tolak):
                         st.error("Pengajuan telah ditolak.")
                         time.sleep(1.2); st.rerun()
                         
@@ -471,7 +471,7 @@ elif role_aktif == "Kabid":
         st.info("Belum ada data pengajuan sama sekali.")
     for idx_all, db_item in enumerate(data_saat_ini["database"]):
         with st.expander(f"Berkas: **{db_item['nama']}** — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
-            st.write(f"**Nama Pengaju (Pemohon):** **{db_item['nama']}** (No: {db_item['no_anggota']})")
+            st.write(f"**Nama Pengaju (Pemohon):** **{db_item['nama']}** (No: {db_item['NIK']})")
             st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
             st.write(f"**Nominal:** Rp {db_item['nominal']:,}")
             st.write(f"**Keperluan:** {db_item['keperluan']}")
@@ -504,7 +504,7 @@ elif role_aktif == "Direktur":
                     st.error("❌ Tanda tangan wajib diisi sebelum verifikasi!")
                 else:
                     for d in data_saat_ini["database"]:
-                        if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Direktur":
+                        if str(d["NIK"]).strip() == str(item["NIK"]).strip() and d.get("status") == "Menunggu Direktur":
                             d["status"] = "SELESAI"
                             d["ttd_direktur"] = ttd_dir
                             break
@@ -517,7 +517,7 @@ elif role_aktif == "Direktur":
                 if st.button("Kirim Penolakan", key=f"tolak_dir_{idx}"):
                     if not alasan_tolak:
                         st.warning("Mohon isi alasan penolakan!")
-                    elif update_status_berkas(item['no_anggota'], "DITOLAK", alasan_tolak):
+                    elif update_status_berkas(item['NIK'], "DITOLAK", alasan_tolak):
                         st.error("Pengajuan telah ditolak.")
                         time.sleep(1.2); st.rerun()
                         
@@ -529,7 +529,7 @@ elif role_aktif == "Direktur":
         st.info("Belum ada data pengajuan sama sekali.")
     for idx_all, db_item in enumerate(data_saat_ini["database"]):
         with st.expander(f"Berkas: **{db_item['nama']}** — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
-            st.write(f"**Nama Pengaju (Pemohon):** **{db_item['nama']}** (No: {db_item['no_anggota']})")
+            st.write(f"**Nama Pengaju (Pemohon):** **{db_item['nama']}** (No: {db_item['NIK']})")
             st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
             st.write(f"**Nominal:** Rp {db_item['nominal']:,}")
             st.write(f"**Keperluan:** {db_item['keperluan']}")
@@ -557,12 +557,12 @@ elif role_aktif == "SDM":
             col_s1, col_s2, col_s3 = st.columns([3, 1.5, 1.5])
             with col_s1: st.write(f"✅ Pengaju: **{s_item['nama']}** — Rp {s_item['nominal']:,}")
             with col_s2:
-                if st.button("🖨️ Cetak PDF", key=f"print_sdm_{idx_s}"): st.session_state.print_id_sdm = s_item['no_anggota']
+                if st.button("🖨️ Cetak PDF", key=f"print_sdm_{idx_s}"): st.session_state.print_id_sdm = s_item['NIK']
             with col_s3:
                 if st.button("🗑️ Hapus", key=f"del_sdm_selesai_{idx_s}"):
-                    if hapus_berkas(s_item['no_anggota']): st.toast("Arsip dihapus."); st.rerun()
+                    if hapus_berkas(s_item['NIK']): st.toast("Arsip dihapus."); st.rerun()
             
-            if st.session_state.print_id_sdm == s_item['no_anggota']:
+            if st.session_state.print_id_sdm == s_item['NIK']:
                 if st.button("❌ Tutup Jendela Cetak", key=f"close_print_sdm_{idx_s}"): st.session_state.print_id_sdm = None; st.rerun()
                 html_isi = render_cetak_pdf_html(s_item)
                 st.components.v1.html(html_isi, height=450, scrolling=True)
@@ -575,8 +575,8 @@ elif role_aktif == "SDM":
                 st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
                 st.write(f"**Nominal:** Rp {db_item['nominal']:,}")
                 # Tambahan tombol hapus di transparansi jika berkas macet
-                if st.button(f"🗑️ Hapus Berkas {db_item['no_anggota']}", key=f"del_all_{idx_all}"):
-                    if hapus_berkas(db_item['no_anggota']): st.toast("Berkas dihapus."); st.rerun()
+                if st.button(f"🗑️ Hapus Berkas {db_item['NIK']}", key=f"del_all_{idx_all}"):
+                    if hapus_berkas(db_item['NIK']): st.toast("Berkas dihapus."); st.rerun()
 
     with tab_sdm3:
         # Menampilkan Log keputusan yang sudah kita buat di Langkah 1
@@ -603,7 +603,7 @@ elif role_aktif == "Admin":
             st.write(f"• Pengaju: **{it['nama']}** — Karu Tujuan: *{it.get('target_karu')}* — Status: *{it['status']}*")
             if st.button(f"Selesaikan Paksa ({it['nama']})", key=f"force_done_{idx}"):
                 for d in data_saat_ini["database"]:
-                    if str(d["no_anggota"]).strip() == str(it["no_anggota"]).strip() and d.get("status") == it["status"]:
+                    if str(d["NIK"]).strip() == str(it["NIK"]).strip() and d.get("status") == it["status"]:
                         d["status"] = "SELESAI"
                         break
                 if push_database_to_github(data_saat_ini, sha_saat_ini, f"Bypass Admin: {it['nama']}"):
@@ -620,9 +620,9 @@ elif role_aktif == "Admin":
             with col1: 
                 st.write(f"✅ Pengaju: **{s['nama']}** — Karu: {s.get('target_karu', '-')} — Rp {s['nominal']:,}")
             with col2:
-                if st.button("🖨️ Buka Printer PDF", key=f"print_btn_{idx}"): st.session_state.print_id = s['no_anggota']
+                if st.button("🖨️ Buka Printer PDF", key=f"print_btn_{idx}"): st.session_state.print_id = s['NIK']
             
-            if st.session_state.print_id == s['no_anggota']:
+            if st.session_state.print_id == s['NIK']:
                 if st.button("❌ Tutup Jendela Cetak", key=f"close_btn_{idx}"):
                     st.session_state.print_id = None
                     st.rerun()
@@ -635,7 +635,7 @@ elif role_aktif == "Admin":
             st.info("Belum ada data pengajuan sama sekali.")
         for idx_all, db_item in enumerate(data_saat_ini["database"]):
             with st.expander(f"Berkas: **{db_item['nama']}** — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
-                st.write(f"**Nama Pengaju (Pemohon):** **{db_item['nama']}** (No: {db_item['no_anggota']})")
+                st.write(f"**Nama Pengaju (Pemohon):** **{db_item['nama']}** (No: {db_item['NIK']})")
                 st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
                 st.write(f"**Nominal:** Rp {db_item['nominal']:,}")
                 st.write(f"**Keperluan:** {db_item['keperluan']}")

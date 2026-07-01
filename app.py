@@ -120,7 +120,7 @@ def render_cetak_pdf_html(s):
         </div>
         <table style="width:100%; font-size:13px; margin-bottom:20px;">
             <tr><td><b>Nama Pemohon (Pengaju)</b></td><td>: <b>{s['nama']}</b></td></tr>
-            <tr><td><b>No Anggota</b></td><td>: {s['NIK']}</td></tr>
+            <tr><td><b>NIK</b></td><td>: {s['NIK']}</td></tr>
             <tr><td><b>Nominal Dana</b></td><td>: <b>Rp {s['nominal']:,}</b></td></tr>
             <tr><td><b>Keperluan</b></td><td>: {s['keperluan']}</td></tr>
             <tr><td><b>Karu Tujuan (ACC)</b></td><td>: {s.get('target_karu', '-')}</td></tr>

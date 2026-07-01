@@ -76,8 +76,32 @@ def push_database_to_github(updated_data, sha_lama, message):
     payload = {"message": message, "content": content_encoded}
     if sha_lama:
         payload["sha"] = sha_lama
-    res = requests.put(url, headers=headers, json=payload)
+   res = requests.put(url, headers=headers, json=payload)
     return res.status_code in [200, 201]
+
+# --- TEMPELKAN DI SINI (LANGKAH 1) ---
+
+def update_status_berkas(no_anggota_target, status_baru, alasan=""):
+    global data_saat_ini
+    for d in data_saat_ini["database"]:
+        if str(d["no_anggota"]).strip() == str(no_anggota_target).strip():
+            d["status"] = status_baru
+            d["alasan_penolakan"] = alasan
+            break
+    return push_database_to_github(data_saat_ini, sha_saat_ini, f"Update status ke {status_baru}")
+
+def render_log_keputusan(data):
+    st.subheader("📊 Log Keputusan Akhir")
+    logs = [i for i in data["database"] if i["status"] in ["SELESAI", "DITOLAK"]]
+    if not logs: st.info("Belum ada keputusan.")
+    for l in logs:
+        with st.expander(f"{l['nama']} — Status: {l['status']}"):
+            if l['status'] == "DITOLAK":
+                st.error(f"Alasan: {l.get('alasan_penolakan', '-')}")
+            else:
+                st.success("Disetujui (SELESAI)")
+
+# --- AKHIR TEMPELAN ---
 
 data_saat_ini, sha_saat_ini = load_data_from_github()
 
@@ -348,6 +372,15 @@ elif role_aktif == "Karu":
         cv_div = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=110, width=220, key=f"cv_karu_{idx}")
         
         if st.button("✍️ Setujui & Teruskan Berkas", key=f"btn_karu_{idx}"):
+		# TAMBAHAN: Opsi Penolakan Karu
+        with st.expander("❌ Opsi Penolakan"):
+            alasan_tolak = st.text_input("Alasan Penolakan", key=f"alasan_karu_{idx}")
+            if st.button("Kirim Penolakan", key=f"tolak_karu_{idx}"):
+                if not alasan_tolak:
+                    st.warning("Mohon isi alasan penolakan!")
+                elif update_status_berkas(item['no_anggota'], "DITOLAK", alasan_tolak):
+                    st.error("Pengajuan telah ditolak.")
+                    time.sleep(1.2); st.rerun()
             ttd_div = canvas_to_base64(cv_div.image_data)
             if not ttd_div:
                 st.error("❌ Tanda tangan wajib diisi sebelum verifikasi!")
@@ -394,6 +427,15 @@ elif role_aktif == "Kabid":
         cv_kabid = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=110, width=220, key=f"cv_kabid_{idx}")
         
         if st.button("✍️ ACC & Teruskan ke Direktur", key=f"btn_kabid_{idx}"):
+		# TAMBAHAN: Opsi Penolakan Kabid
+        with st.expander("❌ Opsi Penolakan"):
+            alasan_tolak = st.text_input("Alasan Penolakan", key=f"alasan_kabid_{idx}")
+            if st.button("Kirim Penolakan", key=f"tolak_kabid_{idx}"):
+                if not alasan_tolak:
+                    st.warning("Mohon isi alasan penolakan!")
+                elif update_status_berkas(item['no_anggota'], "DITOLAK", alasan_tolak):
+                    st.error("Pengajuan telah ditolak.")
+                    time.sleep(1.2); st.rerun()
             ttd_kabid = canvas_to_base64(cv_kabid.image_data)
             if not ttd_kabid:
                 st.error("❌ Tanda tangan wajib diisi sebelum verifikasi!")
@@ -439,6 +481,15 @@ elif role_aktif == "Direktur":
         cv_dir = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=110, width=220, key=f"cv_dir_{idx}")
         
         if st.button("✍️ ACC / Setujui Final Berkas", key=f"btn_dir_{idx}"):
+		# TAMBAHAN: Opsi Penolakan Direktur
+        with st.expander("❌ Opsi Penolakan"):
+            alasan_tolak = st.text_input("Alasan Penolakan", key=f"alasan_dir_{idx}")
+            if st.button("Kirim Penolakan", key=f"tolak_dir_{idx}"):
+                if not alasan_tolak:
+                    st.warning("Mohon isi alasan penolakan!")
+                elif update_status_berkas(item['no_anggota'], "DITOLAK", alasan_tolak):
+                    st.error("Pengajuan telah ditolak.")
+                    time.sleep(1.2); st.rerun()
             ttd_dir = canvas_to_base64(cv_dir.image_data)
             if not ttd_dir:
                 st.error("❌ Tanda tangan wajib diisi sebelum verifikasi!")

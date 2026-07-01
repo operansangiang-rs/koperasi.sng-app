@@ -64,8 +64,6 @@ def load_data_from_github():
                 return TEMPLATE_AWAL, file_content.get("sha", None)
     return TEMPLATE_AWAL, None
 
-# --- FUNGSI UTAMA (GANTI BLOK LAMA DENGAN INI) ---
-
 def push_database_to_github(updated_data, sha_lama, message):
     json_string = json.dumps(updated_data, indent=4, ensure_ascii=False)
     content_encoded = base64.b64encode(json_string.encode("utf-8")).decode("utf-8")
@@ -78,8 +76,10 @@ def push_database_to_github(updated_data, sha_lama, message):
     payload = {"message": message, "content": content_encoded}
     if sha_lama:
         payload["sha"] = sha_lama
-    res = requests.put(url, headers=headers, json=payload)
+   res = requests.put(url, headers=headers, json=payload)
     return res.status_code in [200, 201]
+
+# --- TEMPELKAN DI SINI (LANGKAH 1) ---
 
 def update_status_berkas(no_anggota_target, status_baru, alasan=""):
     global data_saat_ini
@@ -89,12 +89,6 @@ def update_status_berkas(no_anggota_target, status_baru, alasan=""):
             d["alasan_penolakan"] = alasan
             break
     return push_database_to_github(data_saat_ini, sha_saat_ini, f"Update status ke {status_baru}")
-
-# FUNGSI INI YANG TADI MENGAKIBATKAN ERROR KARENA BELUM ADA
-def hapus_berkas(no_anggota_target):
-    global data_saat_ini
-    data_saat_ini["database"] = [d for d in data_saat_ini["database"] if str(d["no_anggota"]).strip() != str(no_anggota_target).strip()]
-    return push_database_to_github(data_saat_ini, sha_saat_ini, f"Hapus berkas: {no_anggota_target}")
 
 def render_log_keputusan(data):
     st.subheader("📊 Log Keputusan Akhir")
@@ -107,8 +101,10 @@ def render_log_keputusan(data):
             else:
                 st.success("Disetujui (SELESAI)")
 
-# BARU SETELAH SEMUA FUNGSI ADA, KITA LOAD DATA
+# --- AKHIR TEMPELAN ---
+
 data_saat_ini, sha_saat_ini = load_data_from_github()
+
 # =========================================================================
 # 🔑 HTML RENDER TAMPILAN CETAK PDF FORMULIR
 # =========================================================================
@@ -342,7 +338,7 @@ if role_aktif == "User Biasa":
                     time.sleep(1.2); st.rerun()
 
 # ---------------------------------------------------------------------
-# ✅ KARU (KEPALA REGU) - REVISI
+# ✅ KARU (KEPALA REGU)
 # ---------------------------------------------------------------------
 elif role_aktif == "Karu":
     st.subheader(f"👋 Selamat Datang Kepala Regu (Karu): {user_login_aktif['username']}")
@@ -360,8 +356,8 @@ elif role_aktif == "Karu":
         st.markdown("### 📋 Berkas Pengajuan Perlu Diproses")
         st.success(f"Ditujukan Kepada Anda (Karu): **{item.get('target_karu')}**")
         
-        st.write(f"**Nama Pemohon:** **{item['nama']}** (No: {item['no_anggota']})")
-        st.write(f"**Penjamin:** **{item.get('nama_istri_saudara', '-')}**")
+        st.write(f"**Nama Pengaju (Pemohon):** **{item['nama']}** (No: {item['no_anggota']})")
+        st.write(f"**Penjamin (Istri/Saudara):** **{item.get('nama_istri_saudara', '-')}**")
         st.write(f"**Nominal:** Rp {item['nominal']:,} | **Keperluan:** {item['keperluan']}")
         
         c_img1, c_img2 = st.columns(2)
@@ -369,39 +365,34 @@ elif role_aktif == "Karu":
             st.caption("Tanda Tangan Pemohon:")
             st.image(base64.b64decode(item["ttd_pengaju"]), width=120)
         with c_img2:
-            st.caption(f"Tanda Tangan Penjamin:")
+            st.caption(f"Tanda Tangan Penjamin ({item.get('nama_istri_saudara', 'Istri/Saudara')}):")
             st.image(base64.b64decode(item["ttd_keluarga"]), width=120)
             
         st.write(f"**Tanda Tangan ACC Karu ({user_login_aktif['username']}):**")
         cv_div = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=110, width=220, key=f"cv_karu_{idx}")
         
-        col_btn1, col_btn2 = st.columns(2)
-        
-        with col_btn1:
-            if st.button("✍️ Setujui & Teruskan", key=f"btn_karu_{idx}"):
-                ttd_div = canvas_to_base64(cv_div.image_data)
-                if not ttd_div:
-                    st.error("❌ Tanda tangan wajib diisi!")
-                else:
-                    for d in data_saat_ini["database"]:
-                        if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Verifikasi Karu":
-                            d["status"] = "Menunggu Bidang"
-                            d["ttd_kadiv"] = ttd_div
-                            break
-                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Karu ACC: {item['nama']}"):
-                        st.success("✅ Berhasil disetujui!")
-                        time.sleep(1.2); st.rerun()
-
-        with col_btn2:
-            with st.expander("❌ Opsi Penolakan"):
-                alasan_tolak = st.text_input("Alasan Penolakan", key=f"alasan_karu_{idx}")
-                if st.button("Kirim Penolakan", key=f"tolak_karu_{idx}"):
-                    if not alasan_tolak:
-                        st.warning("Mohon isi alasan penolakan!")
-                    elif update_status_berkas(item['no_anggota'], "DITOLAK", alasan_tolak):
-                        st.error("Pengajuan ditolak.")
-                        time.sleep(1.2); st.rerun()
-        
+        if st.button("✍️ Setujui & Teruskan Berkas", key=f"btn_karu_{idx}"):
+		# TAMBAHAN: Opsi Penolakan Karu
+        with st.expander("❌ Opsi Penolakan"):
+            alasan_tolak = st.text_input("Alasan Penolakan", key=f"alasan_karu_{idx}")
+            if st.button("Kirim Penolakan", key=f"tolak_karu_{idx}"):
+                if not alasan_tolak:
+                    st.warning("Mohon isi alasan penolakan!")
+                elif update_status_berkas(item['no_anggota'], "DITOLAK", alasan_tolak):
+                    st.error("Pengajuan telah ditolak.")
+                    time.sleep(1.2); st.rerun()
+            ttd_div = canvas_to_base64(cv_div.image_data)
+            if not ttd_div:
+                st.error("❌ Tanda tangan wajib diisi sebelum verifikasi!")
+            else:
+                for d in data_saat_ini["database"]:
+                    if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Verifikasi Karu":
+                        d["status"] = "Menunggu Bidang"
+                        d["ttd_kadiv"] = ttd_div
+                        break
+                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Karu ACC: {item['nama']}"):
+                    st.success("✅ Berhasil disetujui Karu! Berkas dilanjutkan ke Kepala Bidang (Kabid).")
+                    time.sleep(1.2); st.rerun()
         st.write("---")
 
     # Bagian Transparansi Baca Seluruh Pengajuan
@@ -418,7 +409,7 @@ elif role_aktif == "Karu":
             st.write(f"**Penjamin:** {db_item.get('nama_istri_saudara', '-')}")
 
 # ---------------------------------------------------------------------
-# ✅ KABID (KEPALA BIDANG) - REVISI
+# ✅ KABID (KEPALA BIDANG)
 # ---------------------------------------------------------------------
 elif role_aktif == "Kabid":
     st.subheader("👋 Selamat Datang Kepala Bidang (Kabid)")
@@ -435,33 +426,27 @@ elif role_aktif == "Kabid":
         st.write(f"**Tanda Tangan ACC Kepala Bidang (Kabid):**")
         cv_kabid = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=110, width=220, key=f"cv_kabid_{idx}")
         
-        # Kolom untuk tombol agar rapi
-        col_b1, col_b2 = st.columns(2)
-        
-        with col_b1:
-            if st.button("✍️ ACC & Teruskan ke Direktur", key=f"btn_kabid_{idx}"):
-                ttd_kabid = canvas_to_base64(cv_kabid.image_data)
-                if not ttd_kabid:
-                    st.error("❌ Tanda tangan wajib diisi sebelum verifikasi!")
-                else:
-                    for d in data_saat_ini["database"]:
-                        if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Bidang":
-                            d["status"] = "Menunggu Direktur"
-                            d["ttd_kabid"] = ttd_kabid
-                            break
-                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Kabid ACC: {item['nama']}"):
-                        st.success("✅ Berhasil disetujui Kabid!"); time.sleep(1.2); st.rerun()
-
-        with col_b2:
-            with st.expander("❌ Opsi Penolakan"):
-                alasan_tolak = st.text_input("Alasan Penolakan", key=f"alasan_kabid_{idx}")
-                if st.button("Kirim Penolakan", key=f"tolak_kabid_{idx}"):
-                    if not alasan_tolak:
-                        st.warning("Mohon isi alasan penolakan!")
-                    elif update_status_berkas(item['no_anggota'], "DITOLAK", alasan_tolak):
-                        st.error("Pengajuan telah ditolak.")
-                        time.sleep(1.2); st.rerun()
-                        
+        if st.button("✍️ ACC & Teruskan ke Direktur", key=f"btn_kabid_{idx}"):
+		# TAMBAHAN: Opsi Penolakan Kabid
+        with st.expander("❌ Opsi Penolakan"):
+            alasan_tolak = st.text_input("Alasan Penolakan", key=f"alasan_kabid_{idx}")
+            if st.button("Kirim Penolakan", key=f"tolak_kabid_{idx}"):
+                if not alasan_tolak:
+                    st.warning("Mohon isi alasan penolakan!")
+                elif update_status_berkas(item['no_anggota'], "DITOLAK", alasan_tolak):
+                    st.error("Pengajuan telah ditolak.")
+                    time.sleep(1.2); st.rerun()
+            ttd_kabid = canvas_to_base64(cv_kabid.image_data)
+            if not ttd_kabid:
+                st.error("❌ Tanda tangan wajib diisi sebelum verifikasi!")
+            else:
+                for d in data_saat_ini["database"]:
+                    if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Bidang":
+                        d["status"] = "Menunggu Direktur"
+                        d["ttd_kabid"] = ttd_kabid
+                        break
+                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Kabid ACC: {item['nama']}"):
+                    st.success("✅ Berhasil disetujui Kabid! Diteruskan ke Direktur."); time.sleep(1.2); st.rerun()
         st.write("---")
 
     # Bagian Transparansi Baca Seluruh Pengajuan
@@ -478,7 +463,7 @@ elif role_aktif == "Kabid":
             st.write(f"**Penjamin:** {db_item.get('nama_istri_saudara', '-')}")
 
 # ---------------------------------------------------------------------
-# ✅ DIREKTUR - REVISI
+# ✅ DIREKTUR
 # ---------------------------------------------------------------------
 elif role_aktif == "Direktur":
     st.subheader("👋 Selamat Datang Direktur Utama")
@@ -495,33 +480,29 @@ elif role_aktif == "Direktur":
         st.write(f"**Tanda Tangan ACC Direktur Utama:**")
         cv_dir = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=110, width=220, key=f"cv_dir_{idx}")
         
-        col_d1, col_d2 = st.columns(2)
-        
-        with col_d1:
-            if st.button("✍️ ACC / Setujui Final Berkas", key=f"btn_dir_{idx}"):
-                ttd_dir = canvas_to_base64(cv_dir.image_data)
-                if not ttd_dir:
-                    st.error("❌ Tanda tangan wajib diisi sebelum verifikasi!")
-                else:
-                    for d in data_saat_ini["database"]:
-                        if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Direktur":
-                            d["status"] = "SELESAI"
-                            d["ttd_direktur"] = ttd_dir
-                            break
-                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Direktur ACC: {item['nama']}"):
-                        st.success("✅ Pengajuan telah di-ACC Direktur dan SELESAI."); time.sleep(1.2); st.rerun()
-
-        with col_d2:
-            with st.expander("❌ Opsi Penolakan"):
-                alasan_tolak = st.text_input("Alasan Penolakan", key=f"alasan_dir_{idx}")
-                if st.button("Kirim Penolakan", key=f"tolak_dir_{idx}"):
-                    if not alasan_tolak:
-                        st.warning("Mohon isi alasan penolakan!")
-                    elif update_status_berkas(item['no_anggota'], "DITOLAK", alasan_tolak):
-                        st.error("Pengajuan telah ditolak.")
-                        time.sleep(1.2); st.rerun()
-                        
+        if st.button("✍️ ACC / Setujui Final Berkas", key=f"btn_dir_{idx}"):
+		# TAMBAHAN: Opsi Penolakan Direktur
+        with st.expander("❌ Opsi Penolakan"):
+            alasan_tolak = st.text_input("Alasan Penolakan", key=f"alasan_dir_{idx}")
+            if st.button("Kirim Penolakan", key=f"tolak_dir_{idx}"):
+                if not alasan_tolak:
+                    st.warning("Mohon isi alasan penolakan!")
+                elif update_status_berkas(item['no_anggota'], "DITOLAK", alasan_tolak):
+                    st.error("Pengajuan telah ditolak.")
+                    time.sleep(1.2); st.rerun()
+            ttd_dir = canvas_to_base64(cv_dir.image_data)
+            if not ttd_dir:
+                st.error("❌ Tanda tangan wajib diisi sebelum verifikasi!")
+            else:
+                for d in data_saat_ini["database"]:
+                    if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Direktur":
+                        d["status"] = "SELESAI"
+                        d["ttd_direktur"] = ttd_dir
+                        break
+                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Direktur ACC: {item['nama']}"):
+                    st.success("✅ Pengajuan telah di-ACC Direktur dan SELESAI."); time.sleep(1.2); st.rerun()
         st.write("---")
+
     # Bagian Transparansi Baca Seluruh Pengajuan
     st.markdown("---")
     st.subheader("👁️ Transparansi: Pemantauan Semua Pengajuan Berjalan")
@@ -536,56 +517,63 @@ elif role_aktif == "Direktur":
             st.write(f"**Penjamin:** {db_item.get('nama_istri_saudara', '-')}")
 
 # ---------------------------------------------------------------------
-# ✅ SDM (MANAJEMEN DATA PORTAL) - REVISI
+# ✅ SDM
 # ---------------------------------------------------------------------
 elif role_aktif == "SDM":
     st.subheader("👋 Halaman SDM (Manajemen Data Portal)")
     st.info("Anda dapat memantau seluruh rekapitulasi pengajuan dan mengelola akun akses.")
     
-    # Menambahkan tab baru khusus untuk Log Keputusan
-    tab_sdm1, tab_sdm2, tab_sdm3, tab_sdm4 = st.tabs(["📋 Arsip Selesai", "👁️ Transparansi", "📊 Log Keputusan", "👥 Akun"])
+    tab_sdm1, tab_sdm2, tab_sdm3 = st.tabs(["📋 Rekap Berkas Selesai", "👁️ Transparansi Semua Berkas", "👥 Manajemen Akun Akses"])
     
     with tab_sdm1:
         st.subheader("📑 Arsip Berkas Selesai (ACC Lengkap)")
         selesais_sdm = [i for i in data_saat_ini["database"] if i.get("status") == "SELESAI"]
         
-        if not selesais_sdm: st.info("Belum ada arsip data yang berstatus selesai.")
-        
-        if "print_id_sdm" not in st.session_state: st.session_state.print_id_sdm = None
+        if not selesais_sdm: 
+            st.info("Belum ada arsip data yang berstatus selesai.")
+            
+        if "print_id_sdm" not in st.session_state: 
+            st.session_state.print_id_sdm = None
             
         for idx_s, s_item in enumerate(selesais_sdm):
             col_s1, col_s2, col_s3 = st.columns([3, 1.5, 1.5])
-            with col_s1: st.write(f"✅ Pengaju: **{s_item['nama']}** — Rp {s_item['nominal']:,}")
+            with col_s1: 
+                st.write(f"✅ Pengaju: **{s_item['nama']}** — Rp {s_item['nominal']:,}")
             with col_s2:
-                if st.button("🖨️ Cetak PDF", key=f"print_sdm_{idx_s}"): st.session_state.print_id_sdm = s_item['no_anggota']
+                if st.button("🖨️ Buka Printer PDF", key=f"print_sdm_{idx_s}"): 
+                    st.session_state.print_id_sdm = s_item['no_anggota']
             with col_s3:
-                if st.button("🗑️ Hapus", key=f"del_sdm_selesai_{idx_s}"):
-                    if hapus_berkas(s_item['no_anggota']): st.toast("Arsip dihapus."); st.rerun()
+                if st.button("🗑️ Hapus Berkas", key=f"del_sdm_{idx_s}"):
+                    data_saat_ini["database"] = [d for d in data_saat_ini["database"] if d["no_anggota"] != s_item["no_anggota"]]
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"SDM Hapus Arsip: {s_item['nama']}"):
+                        st.toast(f"Arsip {s_item['nama']} berhasil dihapus permanen.")
+                        time.sleep(1.2); st.rerun()
             
             if st.session_state.print_id_sdm == s_item['no_anggota']:
-                if st.button("❌ Tutup Jendela Cetak", key=f"close_print_sdm_{idx_s}"): st.session_state.print_id_sdm = None; st.rerun()
+                if st.button("❌ Tutup Jendela Cetak", key=f"close_print_sdm_{idx_s}"):
+                    st.session_state.print_id_sdm = None
+                    st.rerun()
                 html_isi = render_cetak_pdf_html(s_item)
                 st.components.v1.html(html_isi, height=450, scrolling=True)
             st.write("---")
             
     with tab_sdm2:
-        st.subheader("👁️ Transparansi: Semua Berkas Berjalan")
+        st.subheader("👁️ Transparansi: Pemantauan Seluruh Pengajuan Berjalan")
+        if not data_saat_ini["database"]:
+            st.info("Belum ada data pengajuan sama sekali.")
         for idx_all, db_item in enumerate(data_saat_ini["database"]):
-            with st.expander(f"Berkas: {db_item['nama']} — Status: {db_item['status']}"):
+            with st.expander(f"Berkas: **{db_item['nama']}** — Ke: {db_item.get('target_karu')} — Status: {db_item['status']}"):
+                st.write(f"**Nama Pengaju (Pemohon):** **{db_item['nama']}** (No: {db_item['no_anggota']})")
                 st.write(f"**Tujuan Karu:** {db_item.get('target_karu')}")
                 st.write(f"**Nominal:** Rp {db_item['nominal']:,}")
-                # Tambahan tombol hapus di transparansi jika berkas macet
-                if st.button(f"🗑️ Hapus Berkas {db_item['no_anggota']}", key=f"del_all_{idx_all}"):
-                    if hapus_berkas(db_item['no_anggota']): st.toast("Berkas dihapus."); st.rerun()
+                st.write(f"**Keperluan:** {db_item['keperluan']}")
+                st.write(f"**Penjamin:** {db_item.get('nama_istri_saudara', '-')}")
 
     with tab_sdm3:
-        # Menampilkan Log keputusan yang sudah kita buat di Langkah 1
-        render_log_keputusan(data_saat_ini)
-
-    with tab_sdm4:
-        st.warning("⚠️ *Manajemen akun diarahkan melalui login Super Admin.*")
+        st.warning("⚠️ *Manajemen penambahan/pengurangan akun login diarahkan melalui login Super Admin (Admin Portal).*")
         for u_item in data_saat_ini["users"]:
             st.write(f"• Username: **{u_item['username']}** | Role: *{u_item['role']}*")
+
 # ---------------------------------------------------------------------
 # ✅ SUPER ADMIN (ADMIN PORTAL: AKSES SEGALA MENU DAN PENGATURAN)
 # ---------------------------------------------------------------------

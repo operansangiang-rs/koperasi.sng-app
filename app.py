@@ -76,10 +76,8 @@ def push_database_to_github(updated_data, sha_lama, message):
     payload = {"message": message, "content": content_encoded}
     if sha_lama:
         payload["sha"] = sha_lama
-   res = requests.put(url, headers=headers, json=payload)
+    res = requests.put(url, headers=headers, json=payload)
     return res.status_code in [200, 201]
-
-# --- TEMPELKAN DI SINI (LANGKAH 1) ---
 
 def update_status_berkas(no_anggota_target, status_baru, alasan=""):
     global data_saat_ini
@@ -101,10 +99,7 @@ def render_log_keputusan(data):
             else:
                 st.success("Disetujui (SELESAI)")
 
-# --- AKHIR TEMPELAN ---
-
 data_saat_ini, sha_saat_ini = load_data_from_github()
-
 # =========================================================================
 # 🔑 HTML RENDER TAMPILAN CETAK PDF FORMULIR
 # =========================================================================

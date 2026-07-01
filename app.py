@@ -333,7 +333,7 @@ if role_aktif == "User Biasa":
                     time.sleep(1.2); st.rerun()
 
 # ---------------------------------------------------------------------
-# ✅ KARU (KEPALA REGU)
+# ✅ KARU (KEPALA REGU) - REVISI
 # ---------------------------------------------------------------------
 elif role_aktif == "Karu":
     st.subheader(f"👋 Selamat Datang Kepala Regu (Karu): {user_login_aktif['username']}")
@@ -351,8 +351,8 @@ elif role_aktif == "Karu":
         st.markdown("### 📋 Berkas Pengajuan Perlu Diproses")
         st.success(f"Ditujukan Kepada Anda (Karu): **{item.get('target_karu')}**")
         
-        st.write(f"**Nama Pengaju (Pemohon):** **{item['nama']}** (No: {item['no_anggota']})")
-        st.write(f"**Penjamin (Istri/Saudara):** **{item.get('nama_istri_saudara', '-')}**")
+        st.write(f"**Nama Pemohon:** **{item['nama']}** (No: {item['no_anggota']})")
+        st.write(f"**Penjamin:** **{item.get('nama_istri_saudara', '-')}**")
         st.write(f"**Nominal:** Rp {item['nominal']:,} | **Keperluan:** {item['keperluan']}")
         
         c_img1, c_img2 = st.columns(2)
@@ -360,34 +360,39 @@ elif role_aktif == "Karu":
             st.caption("Tanda Tangan Pemohon:")
             st.image(base64.b64decode(item["ttd_pengaju"]), width=120)
         with c_img2:
-            st.caption(f"Tanda Tangan Penjamin ({item.get('nama_istri_saudara', 'Istri/Saudara')}):")
+            st.caption(f"Tanda Tangan Penjamin:")
             st.image(base64.b64decode(item["ttd_keluarga"]), width=120)
             
         st.write(f"**Tanda Tangan ACC Karu ({user_login_aktif['username']}):**")
         cv_div = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=110, width=220, key=f"cv_karu_{idx}")
         
-        if st.button("✍️ Setujui & Teruskan Berkas", key=f"btn_karu_{idx}"):
-		# TAMBAHAN: Opsi Penolakan Karu
-        with st.expander("❌ Opsi Penolakan"):
-            alasan_tolak = st.text_input("Alasan Penolakan", key=f"alasan_karu_{idx}")
-            if st.button("Kirim Penolakan", key=f"tolak_karu_{idx}"):
-                if not alasan_tolak:
-                    st.warning("Mohon isi alasan penolakan!")
-                elif update_status_berkas(item['no_anggota'], "DITOLAK", alasan_tolak):
-                    st.error("Pengajuan telah ditolak.")
-                    time.sleep(1.2); st.rerun()
-            ttd_div = canvas_to_base64(cv_div.image_data)
-            if not ttd_div:
-                st.error("❌ Tanda tangan wajib diisi sebelum verifikasi!")
-            else:
-                for d in data_saat_ini["database"]:
-                    if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Verifikasi Karu":
-                        d["status"] = "Menunggu Bidang"
-                        d["ttd_kadiv"] = ttd_div
-                        break
-                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Karu ACC: {item['nama']}"):
-                    st.success("✅ Berhasil disetujui Karu! Berkas dilanjutkan ke Kepala Bidang (Kabid).")
-                    time.sleep(1.2); st.rerun()
+        col_btn1, col_btn2 = st.columns(2)
+        
+        with col_btn1:
+            if st.button("✍️ Setujui & Teruskan", key=f"btn_karu_{idx}"):
+                ttd_div = canvas_to_base64(cv_div.image_data)
+                if not ttd_div:
+                    st.error("❌ Tanda tangan wajib diisi!")
+                else:
+                    for d in data_saat_ini["database"]:
+                        if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Verifikasi Karu":
+                            d["status"] = "Menunggu Bidang"
+                            d["ttd_kadiv"] = ttd_div
+                            break
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Karu ACC: {item['nama']}"):
+                        st.success("✅ Berhasil disetujui!")
+                        time.sleep(1.2); st.rerun()
+
+        with col_btn2:
+            with st.expander("❌ Opsi Penolakan"):
+                alasan_tolak = st.text_input("Alasan Penolakan", key=f"alasan_karu_{idx}")
+                if st.button("Kirim Penolakan", key=f"tolak_karu_{idx}"):
+                    if not alasan_tolak:
+                        st.warning("Mohon isi alasan penolakan!")
+                    elif update_status_berkas(item['no_anggota'], "DITOLAK", alasan_tolak):
+                        st.error("Pengajuan ditolak.")
+                        time.sleep(1.2); st.rerun()
+        
         st.write("---")
 
     # Bagian Transparansi Baca Seluruh Pengajuan

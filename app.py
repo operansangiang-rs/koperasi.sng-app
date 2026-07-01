@@ -409,7 +409,7 @@ elif role_aktif == "Karu":
             st.write(f"**Penjamin:** {db_item.get('nama_istri_saudara', '-')}")
 
 # ---------------------------------------------------------------------
-# ✅ KABID (KEPALA BIDANG)
+# ✅ KABID (KEPALA BIDANG) - REVISI
 # ---------------------------------------------------------------------
 elif role_aktif == "Kabid":
     st.subheader("👋 Selamat Datang Kepala Bidang (Kabid)")
@@ -426,27 +426,33 @@ elif role_aktif == "Kabid":
         st.write(f"**Tanda Tangan ACC Kepala Bidang (Kabid):**")
         cv_kabid = st_canvas(stroke_width=3, stroke_color="#000000", background_color="#ffffff", height=110, width=220, key=f"cv_kabid_{idx}")
         
-        if st.button("✍️ ACC & Teruskan ke Direktur", key=f"btn_kabid_{idx}"):
-		# TAMBAHAN: Opsi Penolakan Kabid
-        with st.expander("❌ Opsi Penolakan"):
-            alasan_tolak = st.text_input("Alasan Penolakan", key=f"alasan_kabid_{idx}")
-            if st.button("Kirim Penolakan", key=f"tolak_kabid_{idx}"):
-                if not alasan_tolak:
-                    st.warning("Mohon isi alasan penolakan!")
-                elif update_status_berkas(item['no_anggota'], "DITOLAK", alasan_tolak):
-                    st.error("Pengajuan telah ditolak.")
-                    time.sleep(1.2); st.rerun()
-            ttd_kabid = canvas_to_base64(cv_kabid.image_data)
-            if not ttd_kabid:
-                st.error("❌ Tanda tangan wajib diisi sebelum verifikasi!")
-            else:
-                for d in data_saat_ini["database"]:
-                    if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Bidang":
-                        d["status"] = "Menunggu Direktur"
-                        d["ttd_kabid"] = ttd_kabid
-                        break
-                if push_database_to_github(data_saat_ini, sha_saat_ini, f"Kabid ACC: {item['nama']}"):
-                    st.success("✅ Berhasil disetujui Kabid! Diteruskan ke Direktur."); time.sleep(1.2); st.rerun()
+        # Kolom untuk tombol agar rapi
+        col_b1, col_b2 = st.columns(2)
+        
+        with col_b1:
+            if st.button("✍️ ACC & Teruskan ke Direktur", key=f"btn_kabid_{idx}"):
+                ttd_kabid = canvas_to_base64(cv_kabid.image_data)
+                if not ttd_kabid:
+                    st.error("❌ Tanda tangan wajib diisi sebelum verifikasi!")
+                else:
+                    for d in data_saat_ini["database"]:
+                        if str(d["no_anggota"]).strip() == str(item["no_anggota"]).strip() and d.get("status") == "Menunggu Bidang":
+                            d["status"] = "Menunggu Direktur"
+                            d["ttd_kabid"] = ttd_kabid
+                            break
+                    if push_database_to_github(data_saat_ini, sha_saat_ini, f"Kabid ACC: {item['nama']}"):
+                        st.success("✅ Berhasil disetujui Kabid!"); time.sleep(1.2); st.rerun()
+
+        with col_b2:
+            with st.expander("❌ Opsi Penolakan"):
+                alasan_tolak = st.text_input("Alasan Penolakan", key=f"alasan_kabid_{idx}")
+                if st.button("Kirim Penolakan", key=f"tolak_kabid_{idx}"):
+                    if not alasan_tolak:
+                        st.warning("Mohon isi alasan penolakan!")
+                    elif update_status_berkas(item['no_anggota'], "DITOLAK", alasan_tolak):
+                        st.error("Pengajuan telah ditolak.")
+                        time.sleep(1.2); st.rerun()
+                        
         st.write("---")
 
     # Bagian Transparansi Baca Seluruh Pengajuan

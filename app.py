@@ -64,6 +64,8 @@ def load_data_from_github():
                 return TEMPLATE_AWAL, file_content.get("sha", None)
     return TEMPLATE_AWAL, None
 
+# --- FUNGSI UTAMA (GANTI BLOK LAMA DENGAN INI) ---
+
 def push_database_to_github(updated_data, sha_lama, message):
     json_string = json.dumps(updated_data, indent=4, ensure_ascii=False)
     content_encoded = base64.b64encode(json_string.encode("utf-8")).decode("utf-8")
@@ -88,6 +90,12 @@ def update_status_berkas(no_anggota_target, status_baru, alasan=""):
             break
     return push_database_to_github(data_saat_ini, sha_saat_ini, f"Update status ke {status_baru}")
 
+# FUNGSI INI YANG TADI MENGAKIBATKAN ERROR KARENA BELUM ADA
+def hapus_berkas(no_anggota_target):
+    global data_saat_ini
+    data_saat_ini["database"] = [d for d in data_saat_ini["database"] if str(d["no_anggota"]).strip() != str(no_anggota_target).strip()]
+    return push_database_to_github(data_saat_ini, sha_saat_ini, f"Hapus berkas: {no_anggota_target}")
+
 def render_log_keputusan(data):
     st.subheader("📊 Log Keputusan Akhir")
     logs = [i for i in data["database"] if i["status"] in ["SELESAI", "DITOLAK"]]
@@ -99,6 +107,7 @@ def render_log_keputusan(data):
             else:
                 st.success("Disetujui (SELESAI)")
 
+# BARU SETELAH SEMUA FUNGSI ADA, KITA LOAD DATA
 data_saat_ini, sha_saat_ini = load_data_from_github()
 # =========================================================================
 # 🔑 HTML RENDER TAMPILAN CETAK PDF FORMULIR
